@@ -37,6 +37,16 @@ export class LeaveService {
       .top(MAX_ITEMS_PER_QUERY)();
   }
 
+  public async getAllPending(): Promise<ILeaveRequest[]> {
+    return this.sp.web.lists
+      .getByTitle(LIST_NAMES.LEAVE_REQUESTS)
+      .items.filter(`Status eq 'Submitted'`)
+      .select(...LEAVE_SELECT)
+      .expand(...LEAVE_EXPAND)
+      .orderBy("RequestDate", false)
+      .top(MAX_ITEMS_PER_QUERY)();
+  }
+
   public async create(request: ILeaveRequestCreate): Promise<ILeaveRequest> {
     const result = await this.sp.web.lists
       .getByTitle(LIST_NAMES.LEAVE_REQUESTS)

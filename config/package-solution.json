@@ -15,16 +15,16 @@
       "mpnId": "Undefined-1.20.0"
     },
     "metadata": {
-      "shortDescription": { "default": "LINX Timesheet Management" },
-      "longDescription": { "default": "Comprehensive timesheet management tool for time tracking, project allocation, leave management, and reporting." },
+      "shortDescription": { "default": "Keystone Pulse - Time & Resource Management" },
+      "longDescription": { "default": "Keystone Pulse represents the living rhythm of the organization. Our people are the life of the business, and just like a pulse reveals the health and activity of a body, this tool helps us regularly check, understand, and manage where time is being invested across the company. By tracking hours, effort, and labor cost, Keystone Pulse gives us a clearer view of the organization's energy, capacity, and focus—helping ensure the business stays healthy, aligned, and moving in the right direction." },
       "screenshotPaths": [],
       "videoUrl": "",
       "categories": []
     },
     "features": [
       {
-        "title": "Linx Timesheet Feature",
-        "description": "Provisions the Linx Timesheet web part",
+        "title": "Keystone Pulse Feature",
+        "description": "Provisions the Keystone Pulse web part",
         "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
         "version": "1.0.0.0"
       }

@@ -3,7 +3,23 @@ import { getSP } from "../services/PnPConfig";
 import { ProjectService } from "../services/ProjectService";
 import { IProject, IProjectCreate } from "../models/IProject";
 
-export const useProjects = (activeOnly: boolean = true) => {
+interface UseProjectsOptions {
+  activeOnly?: boolean;
+  /** When set, only returns projects where this user is a team member or project manager. */
+  teamMemberUserId?: number | null;
+}
+
+export const useProjects = (
+  activeOnlyOrOptions: boolean | UseProjectsOptions = true
+) => {
+  const options: UseProjectsOptions =
+    typeof activeOnlyOrOptions === "boolean"
+      ? { activeOnly: activeOnlyOrOptions }
+      : activeOnlyOrOptions;
+
+  const activeOnly = options.activeOnly ?? true;
+  const teamMemberUserId = options.teamMemberUserId ?? null;
+
   const [projects, setProjects] = useState<IProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -15,14 +31,17 @@ export const useProjects = (activeOnly: boolean = true) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await service.getAll(activeOnly);
+      const data =
+        teamMemberUserId != null
+          ? await service.getByTeamMember(teamMemberUserId, activeOnly)
+          : await service.getAll(activeOnly);
       setProjects(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load projects");
     } finally {
       setLoading(false);
     }
-  }, [activeOnly]);
+  }, [activeOnly, teamMemberUserId]);
 
   useEffect(() => {
     refresh();

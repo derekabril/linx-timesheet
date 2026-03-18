@@ -180,5 +180,19 @@ export const useSubmissions = () => {
     [submissionService]
   );
 
-  return { loading, error, submitWeek, approve, reject, revokeApproval, cancelSubmission, getPendingApprovals, getApprovedSubmissions };
+  const getAllPendingApprovals = useCallback(
+    async (): Promise<ITimesheetSubmission[]> => {
+      return submissionService.getAllPending();
+    },
+    [submissionService]
+  );
+
+  const getAllApprovedSubmissions = useCallback(
+    async (): Promise<ITimesheetSubmission[]> => {
+      return submissionService.getAllApproved();
+    },
+    [submissionService]
+  );
+
+  return { loading, error, submitWeek, approve, reject, revokeApproval, cancelSubmission, getPendingApprovals, getApprovedSubmissions, getAllPendingApprovals, getAllApprovedSubmissions };
 };

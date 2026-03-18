@@ -7,7 +7,7 @@ import { DEFAULT_CONFIG } from "../models/IConfiguration";
 
 interface IFieldDef {
   name: string;
-  type: "Text" | "Note" | "Number" | "DateTime" | "Boolean" | "Choice" | "Currency" | "User";
+  type: "Text" | "Note" | "Number" | "DateTime" | "Boolean" | "Choice" | "Currency" | "User" | "UserMulti";
   required?: boolean;
   indexed?: boolean;
   choices?: string[];
@@ -23,7 +23,7 @@ interface ILookupFieldDef {
 }
 
 /**
- * Provisions all SharePoint lists required by Linx Timesheet.
+ * Provisions all SharePoint lists required by Keystone Pulse.
  * Called on first load; safely skips lists that already exist.
  */
 export class ListProvisioningService {
@@ -50,8 +50,12 @@ export class ListProvisioningService {
   }
 
   public async ensureAllLists(): Promise<void> {
-    // Skip provisioning if lists already exist and are seeded
-    if (await this.isAlreadyProvisioned()) return;
+    // Skip full provisioning if lists already exist and are seeded
+    if (await this.isAlreadyProvisioned()) {
+      // Always run migrations to add new fields to existing lists
+      await this.ensureMigrations();
+      return;
+    }
 
     await Promise.all([
       this.ensureList(LIST_NAMES.TIME_ENTRIES, this.timeEntriesFields()),
@@ -62,6 +66,7 @@ export class ListProvisioningService {
       this.ensureList(LIST_NAMES.AUDIT_LOG, this.auditLogFields()),
       this.ensureList(LIST_NAMES.CONFIGURATION, this.configurationFields()),
       this.ensureList(LIST_NAMES.HOLIDAYS, this.holidaysFields()),
+      this.ensureList(LIST_NAMES.USER_RATES, this.userRatesFields()),
     ]);
 
     // Create lookup fields after all lists exist
@@ -70,13 +75,27 @@ export class ListProvisioningService {
     await this.seedDefaultConfiguration();
   }
 
+  /**
+   * Add fields introduced after initial provisioning.
+   * Each migration checks if the field already exists before creating it.
+   */
+  private async ensureMigrations(): Promise<void> {
+    const projectsList = this.sp.web.lists.getByTitle(LIST_NAMES.PROJECTS);
+    await this.addField(projectsList, { name: "TeamMembers", type: "UserMulti" });
+    await this.addField(projectsList, { name: "Division", type: "Text", indexed: true });
+    await this.addField(projectsList, { name: "Area", type: "Text", indexed: true });
+
+    // Ensure UserRates list exists for existing deployments
+    await this.ensureList(LIST_NAMES.USER_RATES, this.userRatesFields());
+  }
+
   private async ensureList(title: string, fields: IFieldDef[]): Promise<void> {
     try {
       // Check if the list exists
       await this.sp.web.lists.getByTitle(title)();
     } catch {
       // List doesn't exist, create it (100 = GenericList template)
-      await this.sp.web.lists.add(title, `Linx Timesheet - ${title}`, 100, false);
+      await this.sp.web.lists.add(title, `Keystone Pulse - ${title}`, 100, false);
     }
 
     // Always ensure all fields exist (addField silently skips existing ones)
@@ -131,6 +150,13 @@ export class ListProvisioningService {
           break;
         case "User":
           await list.fields.addUser(field.name, { SelectionMode: 0 }); // 0 = PeopleOnly
+          break;
+        case "UserMulti":
+          await list.fields.addUser(field.name, { SelectionMode: 0 });
+          // Enable multi-value after creation
+          await list.fields.getByInternalNameOrTitle(field.name).update({
+            AllowMultipleValues: true,
+          });
           break;
       }
 
@@ -238,9 +264,12 @@ export class ListProvisioningService {
   private projectsFields(): IFieldDef[] {
     return [
       { name: "ProjectCode", type: "Text", indexed: true },
+      { name: "Division", type: "Text", indexed: true },
+      { name: "Area", type: "Text", indexed: true },
       { name: "Client", type: "Text", indexed: true },
       { name: "Description", type: "Note" },
       { name: "ProjectManager", type: "User" },
+      { name: "TeamMembers", type: "UserMulti" },
       { name: "PlannedHours", type: "Number" },
       { name: "ActualHours", type: "Number" },
       { name: "StartDate", type: "DateTime", dateOnly: true },
@@ -317,6 +346,13 @@ export class ListProvisioningService {
       { name: "HolidayDate", type: "DateTime", dateOnly: true, indexed: true },
       { name: "Year", type: "Number", indexed: true },
       { name: "IsRecurring", type: "Boolean" },
+    ];
+  }
+
+  private userRatesFields(): IFieldDef[] {
+    return [
+      { name: "Employee", type: "User", indexed: true },
+      { name: "HourlyRate", type: "Currency" },
     ];
   }
 }

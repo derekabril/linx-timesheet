@@ -14,6 +14,7 @@ const defaultAppContext: IAppContext = {
   currentUser: null,
   isManager: false,
   isAdmin: false,
+  isSiteOwner: false,
   configuration: DEFAULT_CONFIG,
   holidays: [],
   isLoading: true,
@@ -35,6 +36,7 @@ export const AppProvider: React.FC<IAppProviderProps> = ({ context, children }) 
   const [currentUser, setCurrentUser] = React.useState<IUser | null>(null);
   const [isManager, setIsManager] = React.useState(false);
   const [isAdmin, setIsAdmin] = React.useState(false);
+  const [isSiteOwner, setIsSiteOwner] = React.useState(false);
   const [configuration, setConfiguration] = React.useState<IAppConfiguration>(DEFAULT_CONFIG);
   const [holidays, setHolidays] = React.useState<IHoliday[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -66,9 +68,10 @@ export const AppProvider: React.FC<IAppProviderProps> = ({ context, children }) 
         await provisioner.ensureAllLists();
 
         // Load user, config, holidays in parallel
-        const [user, manager, config, yearHolidays] = await Promise.all([
+        const [user, manager, siteOwner, config, yearHolidays] = await Promise.all([
           userService.getCurrentUser(),
           userService.isManager(),
+          userService.isSiteOwner(),
           configService.load(),
           holidayService.getByYear(new Date().getFullYear()),
         ]);
@@ -76,6 +79,7 @@ export const AppProvider: React.FC<IAppProviderProps> = ({ context, children }) 
         setCurrentUser(user);
         setIsManager(manager);
         setIsAdmin(user.isSiteAdmin);
+        setIsSiteOwner(siteOwner);
         setConfiguration(config);
         setHolidays(yearHolidays);
       } catch (err) {
@@ -93,6 +97,7 @@ export const AppProvider: React.FC<IAppProviderProps> = ({ context, children }) 
     currentUser,
     isManager,
     isAdmin,
+    isSiteOwner,
     configuration,
     holidays,
     isLoading,

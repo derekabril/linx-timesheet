@@ -19,7 +19,9 @@ export const ManualEntry: React.FC = React.memo(() => {
   const { currentUser, configuration } = useAppContext();
   const { refreshTodayEntries, refreshWeekEntries } = useTimesheetContext();
   const { createManualEntry, loading, error } = useTimeEntries();
-  const { projects } = useProjects();
+  const { projects } = useProjects(
+    currentUser ? { activeOnly: true, teamMemberUserId: currentUser.id } : true
+  );
 
   const [entryDate, setEntryDate] = React.useState<Date>(new Date());
   const [startTime, setStartTime] = React.useState("09:00");

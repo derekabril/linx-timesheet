@@ -20,7 +20,7 @@ export async function exportToExcel(
 ): Promise<void> {
   const { Workbook } = await import(/* webpackChunkName: "exceljs" */ "exceljs");
   const wb = new Workbook();
-  wb.creator = "Linx Timesheet";
+  wb.creator = "Keystone Pulse";
   wb.created = new Date();
 
   const ws = wb.addWorksheet(sheetName);

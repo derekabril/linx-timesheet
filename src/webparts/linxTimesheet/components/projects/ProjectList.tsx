@@ -8,6 +8,9 @@ import {
 import { CommandBar, ICommandBarItemProps } from "@fluentui/react/lib/CommandBar";
 import { Stack } from "@fluentui/react/lib/Stack";
 import { Text } from "@fluentui/react/lib/Text";
+import { IconButton } from "@fluentui/react/lib/Button";
+import { Dialog, DialogType, DialogFooter } from "@fluentui/react/lib/Dialog";
+import { PrimaryButton, DefaultButton } from "@fluentui/react/lib/Button";
 import { SearchBox } from "@fluentui/react/lib/SearchBox";
 import { useProjects } from "../../hooks/useProjects";
 import { useAppContext } from "../../context/AppContext";
@@ -17,25 +20,64 @@ import { LoadingSpinner } from "../common/LoadingSpinner";
 import { ErrorMessage } from "../common/ErrorMessage";
 import { ProjectForm } from "./ProjectForm";
 import { ProjectDetail } from "./ProjectDetail";
+import { Dropdown, IDropdownOption } from "@fluentui/react/lib/Dropdown";
 import { useAppTheme } from "../../hooks/useAppTheme";
 
-export const ProjectList: React.FC = () => {
-  const { isAdmin } = useAppContext();
+interface IProjectListProps {
+  pageSize?: number;
+}
+
+export const ProjectList: React.FC<IProjectListProps> = ({ pageSize = 10 }) => {
+  const { isAdmin, isManager, currentUser } = useAppContext();
   const { colors } = useAppTheme();
-  const { projects, loading, error, refresh, create, update, archive } = useProjects(true);
+  const canCreateProjects = isAdmin || isManager;
+  const isRegularUser = !isAdmin && !isManager;
+
+  // Regular users only see assigned projects; managers/admins see all
+  const { projects, loading, error, refresh, create, update, archive } = useProjects(
+    isRegularUser && currentUser
+      ? { activeOnly: true, teamMemberUserId: currentUser.id }
+      : true
+  );
+
   const [searchText, setSearchText] = React.useState("");
   const [showForm, setShowForm] = React.useState(false);
   const [editProject, setEditProject] = React.useState<IProject | undefined>();
   const [selectedProject, setSelectedProject] = React.useState<IProject | null>(null);
+  const [archiveTarget, setArchiveTarget] = React.useState<IProject | null>(null);
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [itemsPerPage, setItemsPerPage] = React.useState(pageSize);
 
-  const filteredProjects = projects.filter(
-    (p) =>
-      p.Title.toLowerCase().includes(searchText.toLowerCase()) ||
-      p.ProjectCode.toLowerCase().includes(searchText.toLowerCase()) ||
-      p.Client.toLowerCase().includes(searchText.toLowerCase())
+  const filteredProjects = projects.filter((p) => {
+    const search = searchText.toLowerCase();
+    return (
+      (p.Title || "").toLowerCase().includes(search) ||
+      (p.ProjectCode || "").toLowerCase().includes(search) ||
+      (p.Division || "").toLowerCase().includes(search) ||
+      (p.Area || "").toLowerCase().includes(search) ||
+      (p.Client || "").toLowerCase().includes(search)
+    );
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredProjects.length / itemsPerPage));
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedProjects = filteredProjects.slice(
+    (safePage - 1) * itemsPerPage,
+    safePage * itemsPerPage
   );
 
-  const commandItems: ICommandBarItemProps[] = isAdmin
+  // Reset to page 1 when search changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchText]);
+
+  const pageSizeOptions: IDropdownOption[] = [
+    { key: 10, text: "10" },
+    { key: 25, text: "25" },
+    { key: 50, text: "50" },
+  ];
+
+  const commandItems: ICommandBarItemProps[] = canCreateProjects
     ? [
         {
           key: "add",
@@ -88,12 +130,38 @@ export const ProjectList: React.FC = () => {
       ),
     },
     {
+      key: "division",
+      name: "Division",
+      fieldName: "Division",
+      minWidth: 120,
+      maxWidth: 200,
+      isResizable: true,
+      onRender: (item: IProject) => item.Division || "--",
+    },
+    {
+      key: "area",
+      name: "Area",
+      fieldName: "Area",
+      minWidth: 120,
+      maxWidth: 200,
+      isResizable: true,
+      onRender: (item: IProject) => item.Area || "--",
+    },
+    {
       key: "client",
       name: "Client",
       fieldName: "Client",
       minWidth: 120,
       maxWidth: 180,
       isResizable: true,
+    },
+    {
+      key: "pm",
+      name: "Project Manager",
+      minWidth: 120,
+      maxWidth: 180,
+      isResizable: true,
+      onRender: (item: IProject) => item.ProjectManagerTitle || "--",
     },
     {
       key: "planned",
@@ -124,13 +192,33 @@ export const ProjectList: React.FC = () => {
         );
       },
     },
-    {
-      key: "rate",
-      name: "Rate",
-      minWidth: 60,
-      maxWidth: 80,
-      onRender: (item: IProject) => item.HourlyRate > 0 ? `$${item.HourlyRate}` : "--",
-    },
+    ...(canCreateProjects
+      ? [
+          {
+            key: "actions",
+            name: "Actions",
+            minWidth: 80,
+            maxWidth: 100,
+            onRender: (item: IProject) => (
+              <Stack horizontal tokens={{ childrenGap: 4 }}>
+                <IconButton
+                  iconProps={{ iconName: "Edit" }}
+                  title="Edit Project"
+                  onClick={() => {
+                    setEditProject(item);
+                    setShowForm(true);
+                  }}
+                />
+                <IconButton
+                  iconProps={{ iconName: "Archive" }}
+                  title="Archive Project"
+                  onClick={() => setArchiveTarget(item)}
+                />
+              </Stack>
+            ),
+          } as IColumn,
+        ]
+      : []),
   ];
 
   if (loading) return <LoadingSpinner label="Loading projects..." />;
@@ -140,6 +228,9 @@ export const ProjectList: React.FC = () => {
       <ProjectDetail
         project={selectedProject}
         onBack={() => setSelectedProject(null)}
+        onUpdate={async (id, data) => {
+          await update(id, data);
+        }}
       />
     );
   }
@@ -158,12 +249,75 @@ export const ProjectList: React.FC = () => {
       />
 
       <DetailsList
-        items={filteredProjects}
+        items={pagedProjects}
         columns={columns}
         layoutMode={DetailsListLayoutMode.justified}
         selectionMode={SelectionMode.none}
         isHeaderVisible={true}
       />
+
+      <Stack horizontal verticalAlign="center" horizontalAlign="space-between" tokens={{ childrenGap: 12 }}>
+        <Stack horizontal verticalAlign="center" tokens={{ childrenGap: 8 }}>
+          <Text variant="small" styles={{ root: { color: colors.textSecondary } }}>
+            Showing {filteredProjects.length === 0 ? 0 : (safePage - 1) * itemsPerPage + 1}–{Math.min(safePage * itemsPerPage, filteredProjects.length)} of {filteredProjects.length}
+          </Text>
+          <Dropdown
+            options={pageSizeOptions}
+            selectedKey={itemsPerPage}
+            onChange={(_, opt) => {
+              if (opt) {
+                setItemsPerPage(opt.key as number);
+                setCurrentPage(1);
+              }
+            }}
+            styles={{ root: { width: 70 }, title: { fontSize: 12 } }}
+            ariaLabel="Items per page"
+          />
+          <Text variant="small" styles={{ root: { color: colors.textSecondary } }}>per page</Text>
+        </Stack>
+        <Stack horizontal verticalAlign="center" tokens={{ childrenGap: 4 }}>
+          <IconButton
+            iconProps={{ iconName: "ChevronLeft" }}
+            title="Previous page"
+            disabled={safePage <= 1}
+            onClick={() => setCurrentPage(safePage - 1)}
+          />
+          <Text variant="small">
+            Page {safePage} of {totalPages}
+          </Text>
+          <IconButton
+            iconProps={{ iconName: "ChevronRight" }}
+            title="Next page"
+            disabled={safePage >= totalPages}
+            onClick={() => setCurrentPage(safePage + 1)}
+          />
+        </Stack>
+      </Stack>
+
+      <Dialog
+        hidden={!archiveTarget}
+        onDismiss={() => setArchiveTarget(null)}
+        dialogContentProps={{
+          type: DialogType.normal,
+          title: "Archive Project",
+          subText: archiveTarget
+            ? `Are you sure you want to archive "${archiveTarget.Title}"? This project will no longer appear in active lists.`
+            : "",
+        }}
+      >
+        <DialogFooter>
+          <PrimaryButton
+            text="Archive"
+            onClick={async () => {
+              if (archiveTarget) {
+                await archive(archiveTarget.Id);
+                setArchiveTarget(null);
+              }
+            }}
+          />
+          <DefaultButton text="Cancel" onClick={() => setArchiveTarget(null)} />
+        </DialogFooter>
+      </Dialog>
 
       {showForm && (
         <ProjectForm

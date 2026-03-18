@@ -30,12 +30,12 @@ const headerClass = mergeStyles({
 });
 
 export const AppShell: React.FC<IAppShellProps> = ({ title }) => {
-  const { isLoading, error, isManager, isAdmin, currentUser } = useAppContext();
+  const { isLoading, error, isManager, isAdmin, isSiteOwner, currentUser } = useAppContext();
   const { colors } = useAppTheme();
   const [activeTab, setActiveTab] = React.useState<string>(AppTab.Timesheet);
 
   if (isLoading) {
-    return <LoadingSpinner label="Initializing Linx Timesheet..." />;
+    return <LoadingSpinner label="Initializing Keystone Pulse..." />;
   }
 
   if (error) {
@@ -82,7 +82,7 @@ export const AppShell: React.FC<IAppShellProps> = ({ title }) => {
           <LeavePanel />
         </PivotItem>
 
-        {(isManager || isAdmin) && (
+        {(isManager || isAdmin || isSiteOwner) && (
           <PivotItem headerText="Approvals" itemKey={AppTab.Approvals} itemIcon="CheckMark">
             <ApprovalDashboard />
           </PivotItem>

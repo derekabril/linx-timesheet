@@ -6,6 +6,7 @@ interface INavigationTabsProps {
   activeTab: string;
   isManager: boolean;
   isAdmin: boolean;
+  isSiteOwner: boolean;
   onTabChange: (tab: string) => void;
 }
 
@@ -13,6 +14,7 @@ export const NavigationTabs: React.FC<INavigationTabsProps> = ({
   activeTab,
   isManager,
   isAdmin,
+  isSiteOwner,
   onTabChange,
 }) => {
   const handleChange = (item?: PivotItem): void => {
@@ -26,7 +28,7 @@ export const NavigationTabs: React.FC<INavigationTabsProps> = ({
       <PivotItem headerText="My Timesheet" itemKey={AppTab.Timesheet} itemIcon="Clock" />
       <PivotItem headerText="Projects" itemKey={AppTab.Projects} itemIcon="ProjectCollection" />
       <PivotItem headerText="Leave" itemKey={AppTab.Leave} itemIcon="Calendar" />
-      {(isManager || isAdmin) && (
+      {(isManager || isAdmin || isSiteOwner) && (
         <PivotItem headerText="Approvals" itemKey={AppTab.Approvals} itemIcon="CheckMark" />
       )}
       <PivotItem headerText="Reports" itemKey={AppTab.Reports} itemIcon="BarChart4" />

@@ -32,6 +32,18 @@ export class ProjectService {
       .expand(...PROJECT_FIELDS.EXPAND)();
   }
 
+  /**
+   * Get projects where the given user is a team member or project manager.
+   */
+  public async getByTeamMember(userId: number, activeOnly: boolean = true): Promise<IProject[]> {
+    const all = await this.getAll(activeOnly);
+    return all.filter(
+      (p) =>
+        p.ProjectManagerId === userId ||
+        (p.TeamMembersId && p.TeamMembersId.includes(userId))
+    );
+  }
+
   public async getByClient(client: string): Promise<IProject[]> {
     return this.sp.web.lists
       .getByTitle(LIST_NAMES.PROJECTS)

@@ -7,6 +7,7 @@ export const LIST_NAMES = {
   AUDIT_LOG: "LinxAuditLog",
   CONFIGURATION: "LinxConfiguration",
   HOLIDAYS: "LinxHolidays",
+  USER_RATES: "LinxUserRates",
 } as const;
 
 export const TIME_ENTRY_FIELDS = {
@@ -43,16 +44,18 @@ export const PROJECT_FIELDS = {
     "Id",
     "Title",
     "ProjectCode",
+    "Division",
+    "Area",
     "Client",
     "Description",
     "ProjectManagerId",
     "ProjectManager/Title",
+    "TeamMembersId",
     "PlannedHours",
     "ActualHours",
     "StartDate",
     "EndDate",
     "IsActive",
-    "HourlyRate",
     "Created",
     "Modified",
   ],

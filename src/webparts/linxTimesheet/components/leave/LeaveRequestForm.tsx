@@ -58,7 +58,7 @@ export const LeaveRequestForm: React.FC = () => {
         EndDate: toDateString(endDate),
         TotalDays: totalDays,
         Status: LeaveStatus.Submitted,
-        ApproverId: currentUser.managerId || currentUser.id,
+        ApproverId: currentUser.managerId || 0,
         ApproverComments: "",
         RequestDate: new Date().toISOString(),
         Year: startDate.getFullYear(),

@@ -6,6 +6,7 @@ import { OvertimeSettings } from "./OvertimeSettings";
 import { LeaveSettings } from "./LeaveSettings";
 import { HolidayManagement } from "./HolidayManagement";
 import { AuditLogViewer } from "./AuditLogViewer";
+import { UserRateManagement } from "./UserRateManagement";
 
 export const AdminPanel: React.FC = () => {
   return (
@@ -25,6 +26,10 @@ export const AdminPanel: React.FC = () => {
 
         <PivotItem headerText="Holidays" itemIcon="CalendarDay">
           <HolidayManagement />
+        </PivotItem>
+
+        <PivotItem headerText="User Rates" itemIcon="Money">
+          <UserRateManagement />
         </PivotItem>
 
         <PivotItem headerText="Audit Log" itemIcon="DocumentSearch">

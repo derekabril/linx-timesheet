@@ -69,6 +69,34 @@ export class SubmissionService {
   }
 
   /**
+   * Get all pending (submitted) submissions across all employees.
+   */
+  public async getAllPending(): Promise<ITimesheetSubmission[]> {
+    const items = await this.sp.web.lists
+      .getByTitle(LIST_NAMES.SUBMISSIONS)
+      .items.filter(`Status eq 'Submitted'`)
+      .select(...SUBMISSION_FIELDS.SELECT)
+      .expand(...SUBMISSION_FIELDS.EXPAND)
+      .orderBy("SubmittedDate", false)
+      .top(MAX_ITEMS_PER_QUERY)();
+    return SubmissionService.mapSubmissions(items);
+  }
+
+  /**
+   * Get all approved submissions across all employees.
+   */
+  public async getAllApproved(): Promise<ITimesheetSubmission[]> {
+    const items = await this.sp.web.lists
+      .getByTitle(LIST_NAMES.SUBMISSIONS)
+      .items.filter(`Status eq 'Approved'`)
+      .select(...SUBMISSION_FIELDS.SELECT)
+      .expand(...SUBMISSION_FIELDS.EXPAND)
+      .orderBy("ApprovedDate", false)
+      .top(MAX_ITEMS_PER_QUERY)();
+    return SubmissionService.mapSubmissions(items);
+  }
+
+  /**
    * Create a new submission.
    */
   public async create(submission: ITimesheetSubmissionCreate): Promise<ITimesheetSubmission> {

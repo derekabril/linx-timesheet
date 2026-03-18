@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Linx Timesheet is a SharePoint Framework (SPFx) v1.22.1 web part for time tracking, project management, leave management, and reporting. It runs inside SharePoint Online as a client-side web part.
+Keystone Pulse is a SharePoint Framework (SPFx) v1.22.1 web part for time tracking, project management, leave management, and reporting. It runs inside SharePoint Online as a client-side web part. Keystone Pulse represents the living rhythm of the organization—tracking hours, effort, and labor cost to give a clearer view of the organization's energy, capacity, and focus.
 
 ## Build & Development Commands
 

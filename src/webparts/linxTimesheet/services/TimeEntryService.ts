@@ -93,6 +93,21 @@ export class TimeEntryService {
   }
 
   /**
+   * Get entries for multiple submission IDs in a single query.
+   */
+  public async getBySubmissionIds(submissionIds: number[]): Promise<ITimeEntry[]> {
+    if (submissionIds.length === 0) return [];
+    const filter = submissionIds.map((id) => `SubmissionId eq ${id}`).join(" or ");
+    const items = await this.sp.web.lists
+      .getByTitle(LIST_NAMES.TIME_ENTRIES)
+      .items.filter(filter)
+      .select(...TIME_ENTRY_FIELDS.SELECT)
+      .expand(...TIME_ENTRY_FIELDS.EXPAND)
+      .top(MAX_ITEMS_PER_QUERY)();
+    return TimeEntryService.mapEntries(items);
+  }
+
+  /**
    * Get entries for a date range and employee (for reporting).
    */
   public async getByDateRange(

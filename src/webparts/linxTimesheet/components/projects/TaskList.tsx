@@ -13,7 +13,6 @@ import { ITask } from "../../models/ITask";
 import { formatHours } from "../../utils/hoursFormatter";
 import { LoadingSpinner } from "../common/LoadingSpinner";
 import { TaskForm } from "./TaskForm";
-import { useAppContext } from "../../context/AppContext";
 import { useAppTheme } from "../../hooks/useAppTheme";
 
 interface ITaskListProps {
@@ -21,7 +20,6 @@ interface ITaskListProps {
 }
 
 export const TaskList: React.FC<ITaskListProps> = ({ projectId }) => {
-  const { isAdmin } = useAppContext();
   const { colors } = useAppTheme();
   const { tasks, loading, create } = useTasks(projectId);
   const [showForm, setShowForm] = React.useState(false);
@@ -51,13 +49,11 @@ export const TaskList: React.FC<ITaskListProps> = ({ projectId }) => {
     <Stack tokens={{ childrenGap: 8 }}>
       <Stack horizontal horizontalAlign="space-between" verticalAlign="center">
         <Text variant="mediumPlus" styles={{ root: { fontWeight: 600 } }}>Tasks</Text>
-        {isAdmin && (
-          <PrimaryButton
-            text="Add Task"
-            iconProps={{ iconName: "Add" }}
-            onClick={() => setShowForm(true)}
-          />
-        )}
+        <PrimaryButton
+          text="Add Task"
+          iconProps={{ iconName: "Add" }}
+          onClick={() => setShowForm(true)}
+        />
       </Stack>
 
       {tasks.length === 0 ? (

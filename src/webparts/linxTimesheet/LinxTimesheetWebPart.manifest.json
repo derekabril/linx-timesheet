@@ -10,9 +10,9 @@
   "preconfiguredEntries": [
     {
       "groupId": "5c03119e-3074-46fd-976b-c60198311f70",
-      "group": { "default": "LINX" },
-      "title": { "default": "LINX Timesheet" },
-      "description": { "default": "Comprehensive timesheet management for time tracking, projects, leave, approvals, and reporting." },
+      "group": { "default": "Keystone" },
+      "title": { "default": "Keystone Pulse" },
+      "description": { "default": "Keystone Pulse represents the living rhythm of the organization. By tracking hours, effort, and labor cost, it gives a clearer view of the organization's energy, capacity, and focus." },
       "officeFabricIconFontName": "Clock",
       "properties": {}
     }

@@ -35,7 +35,7 @@ export default class LinxTimesheetWebPart extends BaseClientSideWebPart<ILinxTim
   public render(): void {
     const element = React.createElement(App, {
       context: this.context,
-      title: this.properties.title || "LINX Timesheet",
+      title: this.properties.title || "Keystone Pulse",
     });
     ReactDom.render(element, this.domElement);
   }
@@ -52,7 +52,7 @@ export default class LinxTimesheetWebPart extends BaseClientSideWebPart<ILinxTim
     return {
       pages: [
         {
-          header: { description: "LINX Timesheet Settings" },
+          header: { description: "Keystone Pulse Settings" },
           groups: [
             {
               groupName: "General",

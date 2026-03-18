@@ -42,18 +42,20 @@ export const SubmitTimesheet: React.FC = () => {
   );
   const overtime = calculateOvertime(completedEntries, configuration);
 
+  // Allow submission if user has a manager OR site owners exist (they always do)
   const canSubmit =
     !currentSubmission &&
-    completedEntries.length > 0 &&
-    currentUser?.managerId;
+    completedEntries.length > 0;
 
   const handleSubmit = async (): Promise<void> => {
-    if (!currentUser || !currentUser.managerId) return;
+    if (!currentUser) return;
     setError(null);
     try {
+      // Use manager as primary approver; if no manager, set to 0 (site owners will see it)
+      const approverId = currentUser.managerId || 0;
       await submitWeek(
         currentUser.id,
-        currentUser.managerId,
+        approverId,
         selectedWeek.year,
         selectedWeek.weekNumber,
         completedEntries,
@@ -112,8 +114,8 @@ export const SubmitTimesheet: React.FC = () => {
             styles={{ root: { width: 200 } }}
           />
           {!currentUser?.managerId && (
-            <Text variant="small" styles={{ root: { color: colors.textWarning } }}>
-              No manager configured. Contact your admin.
+            <Text variant="small" styles={{ root: { color: colors.textSecondary } }}>
+              No direct manager set. Site owners will review your timesheet.
             </Text>
           )}
         </Stack>

@@ -8,6 +8,7 @@ export interface IAppContextState {
   currentUser: IUser | null;
   isManager: boolean;
   isAdmin: boolean;
+  isSiteOwner: boolean;
   configuration: IAppConfiguration;
   holidays: IHoliday[];
   isLoading: boolean;

@@ -60,6 +60,8 @@ export function validateTimeEntry(data: ITimeEntryFormData): IValidationResult {
 export function validateProject(data: {
   title: string;
   projectCode: string;
+  division?: string;
+  area?: string;
 }): IValidationResult {
   const errors: string[] = [];
 
@@ -73,6 +75,14 @@ export function validateProject(data: {
 
   if (data.projectCode && !/^[A-Za-z0-9-]+$/.test(data.projectCode)) {
     errors.push("Project code can only contain letters, numbers, and hyphens.");
+  }
+
+  if (!data.division || data.division.trim().length === 0) {
+    errors.push("Division is required.");
+  }
+
+  if (!data.area || data.area.trim().length === 0) {
+    errors.push("Area is required.");
   }
 
   return { isValid: errors.length === 0, errors };

@@ -1,7 +1,7 @@
 define([], function () {
   return {
-    PropertyPaneDescription: "Linx Timesheet Configuration",
+    PropertyPaneDescription: "Keystone Pulse Configuration",
     TitleFieldLabel: "Web Part Title",
-    AppTitle: "Linx Timesheet",
+    AppTitle: "Keystone Pulse",
   };
 });
