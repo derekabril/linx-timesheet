@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 lib/
+lib-commonjs/
 dist/
 temp/
 release/
@@ -19,6 +20,9 @@ sharepoint/solution/
 # OS
 .DS_Store
 Thumbs.db
+
+# Test output
+jest-output/
 
 # Logs
 *.log

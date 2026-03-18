@@ -1,1 +1,0 @@
-{"version":3,"file":"IUser.js","sourceRoot":"","sources":["../../../../src/webparts/linxTimesheet/models/IUser.ts"],"names":[],"mappings":"","sourcesContent":["export interface IUser {\n  id: number;\n  loginName: string;\n  displayName: string;\n  email: string;\n  jobTitle: string;\n  managerId: number | null;\n  managerTitle: string | null;\n  isSiteAdmin: boolean;\n}\n"]}
