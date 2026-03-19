@@ -26,7 +26,7 @@ import { useAppTheme } from "../../hooks/useAppTheme";
 
 export const SubmissionHistory: React.FC = () => {
   const { currentUser } = useAppContext();
-  const { refreshSubmission, refreshWeekEntries } = useTimesheetContext();
+  const { currentSubmission, refreshSubmission, refreshWeekEntries } = useTimesheetContext();
   const { cancelSubmission, loading: cancelLoading } = useSubmissions();
   const { colors } = useAppTheme();
   const [submissions, setSubmissions] = React.useState<ITimesheetSubmission[]>([]);
@@ -34,6 +34,8 @@ export const SubmissionHistory: React.FC = () => {
   const [cancelTarget, setCancelTarget] = React.useState<ITimesheetSubmission | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const itemsPerPage = 10;
 
   const sp = getSP();
   const submissionService = React.useMemo(() => new SubmissionService(sp), [sp]);
@@ -52,7 +54,7 @@ export const SubmissionHistory: React.FC = () => {
 
   React.useEffect(() => {
     loadSubmissions();
-  }, [loadSubmissions]);
+  }, [loadSubmissions, currentSubmission]);
 
   const handleCancel = async (): Promise<void> => {
     if (!cancelTarget) return;
@@ -153,13 +155,34 @@ export const SubmissionHistory: React.FC = () => {
           No submissions yet.
         </Text>
       ) : (
-        <DetailsList
-          items={submissions}
-          columns={columns}
-          layoutMode={DetailsListLayoutMode.justified}
-          selectionMode={SelectionMode.none}
-          compact
-        />
+        <>
+          <DetailsList
+            items={submissions.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
+            columns={columns}
+            layoutMode={DetailsListLayoutMode.justified}
+            selectionMode={SelectionMode.none}
+            compact
+          />
+          {submissions.length > itemsPerPage && (
+            <Stack horizontal verticalAlign="center" horizontalAlign="end" tokens={{ childrenGap: 4 }}>
+              <IconButton
+                iconProps={{ iconName: "ChevronLeft" }}
+                title="Previous page"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(currentPage - 1)}
+              />
+              <Text variant="small">
+                Page {currentPage} of {Math.ceil(submissions.length / itemsPerPage)}
+              </Text>
+              <IconButton
+                iconProps={{ iconName: "ChevronRight" }}
+                title="Next page"
+                disabled={currentPage >= Math.ceil(submissions.length / itemsPerPage)}
+                onClick={() => setCurrentPage(currentPage + 1)}
+              />
+            </Stack>
+          )}
+        </>
       )}
 
       <ConfirmDialog

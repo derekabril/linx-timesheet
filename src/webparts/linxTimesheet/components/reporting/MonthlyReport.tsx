@@ -14,6 +14,7 @@ import { getSP } from "../../services/PnPConfig";
 import { ITimeEntry } from "../../models/ITimeEntry";
 import { formatHours } from "../../utils/hoursFormatter";
 import { toDateString } from "../../utils/dateUtils";
+import { calculateEffectiveHours } from "../../utils/effectiveHours";
 import { LoadingSpinner } from "../common/LoadingSpinner";
 import { ExportToolbar } from "./ExportToolbar";
 
@@ -54,20 +55,25 @@ export const MonthlyReport: React.FC = () => {
     load();
   }, [currentUser, selectedMonth, selectedYear]);
 
-  // Group by week
+  // Group by week, using effective hours to avoid Clock/Timer double-counting
   const weeklyTotals = React.useMemo(() => {
-    const weeks = new Map<number, { weekNumber: number; totalHours: number; entries: number }>();
+    const weekEntries = new Map<number, ITimeEntry[]>();
     entries.forEach((e) => {
       const w = e.WeekNumber;
-      const existing = weeks.get(w) || { weekNumber: w, totalHours: 0, entries: 0 };
-      existing.totalHours += e.TotalHours;
-      existing.entries += 1;
-      weeks.set(w, existing);
+      const existing = weekEntries.get(w) || [];
+      existing.push(e);
+      weekEntries.set(w, existing);
     });
-    return Array.from(weeks.values()).sort((a, b) => a.weekNumber - b.weekNumber);
+    return Array.from(weekEntries.entries())
+      .map(([weekNumber, wEntries]) => ({
+        weekNumber,
+        totalHours: calculateEffectiveHours(wEntries),
+        entries: wEntries.length,
+      }))
+      .sort((a, b) => a.weekNumber - b.weekNumber);
   }, [entries]);
 
-  const totalHours = entries.reduce((sum, e) => sum + e.TotalHours, 0);
+  const totalHours = calculateEffectiveHours(entries);
 
   const columns: IColumn[] = [
     { key: "week", name: "Week", minWidth: 60, maxWidth: 80, onRender: (item: { weekNumber: number }) => `W${item.weekNumber}` },

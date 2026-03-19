@@ -2,12 +2,21 @@ import * as React from "react";
 import { PrimaryButton, DefaultButton } from "@fluentui/react/lib/Button";
 import { Stack } from "@fluentui/react/lib/Stack";
 import { Text } from "@fluentui/react/lib/Text";
+import { Icon } from "@fluentui/react/lib/Icon";
+import { mergeStyles, keyframes } from "@fluentui/react/lib/Styling";
 import { useTimesheetContext } from "../../context/TimesheetContext";
 import { useAppContext } from "../../context/AppContext";
 import { useTimeEntries } from "../../hooks/useTimeEntries";
 import { useAppTheme } from "../../hooks/useAppTheme";
 import { formatTime } from "../../utils/dateUtils";
+import { formatTimerDisplay } from "../../utils/hoursFormatter";
 import { ErrorMessage } from "../common/ErrorMessage";
+
+const pulseAnimation = keyframes({
+  "0%": { opacity: 1, transform: "scale(1)" },
+  "50%": { opacity: 0.5, transform: "scale(1.3)" },
+  "100%": { opacity: 1, transform: "scale(1)" },
+});
 
 export const ClockInOut: React.FC = () => {
   const { currentUser } = useAppContext();
@@ -15,6 +24,29 @@ export const ClockInOut: React.FC = () => {
     useTimesheetContext();
   const { clockIn, clockOut, loading, error } = useTimeEntries();
   const { colors, theme } = useAppTheme();
+  const [elapsedSeconds, setElapsedSeconds] = React.useState(0);
+  const intervalRef = React.useRef<number | null>(null);
+
+  const isClockedIn = activeClockEntry !== null;
+
+  // Live elapsed counter when clocked in
+  React.useEffect(() => {
+    if (isClockedIn && activeClockEntry?.ClockIn) {
+      const clockInDate = new Date(activeClockEntry.ClockIn);
+      const updateElapsed = (): void => {
+        const now = new Date();
+        setElapsedSeconds(Math.floor((now.getTime() - clockInDate.getTime()) / 1000));
+      };
+      updateElapsed();
+      intervalRef.current = window.setInterval(updateElapsed, 1000);
+      return () => {
+        if (intervalRef.current) window.clearInterval(intervalRef.current);
+      };
+    } else {
+      setElapsedSeconds(0);
+    }
+    return undefined;
+  }, [isClockedIn, activeClockEntry?.ClockIn]);
 
   const handleClockIn = async (): Promise<void> => {
     if (!currentUser) return;
@@ -31,59 +63,137 @@ export const ClockInOut: React.FC = () => {
     await refreshWeekEntries();
   };
 
-  const isClockedIn = activeClockEntry !== null;
+  const pulseDotClass = mergeStyles({
+    width: 10,
+    height: 10,
+    borderRadius: "50%",
+    backgroundColor: colors.textSuccess,
+    display: "inline-block",
+    animationName: pulseAnimation,
+    animationDuration: "2s",
+    animationIterationCount: "infinite",
+    animationTimingFunction: "ease-in-out",
+  });
+
+  const inactiveDotClass = mergeStyles({
+    width: 10,
+    height: 10,
+    borderRadius: "50%",
+    backgroundColor: colors.textTertiary,
+    display: "inline-block",
+  });
+
+  const elapsedDisplayClass = mergeStyles({
+    fontSize: 32,
+    fontWeight: 700,
+    fontFamily: "'Courier New', monospace",
+    textAlign: "center",
+    color: colors.textSuccess,
+    letterSpacing: "2px",
+  });
+
+  const idleDisplayClass = mergeStyles({
+    fontSize: 32,
+    fontWeight: 700,
+    fontFamily: "'Courier New', monospace",
+    textAlign: "center",
+    color: colors.textTertiary,
+    letterSpacing: "2px",
+  });
 
   return (
     <Stack
       tokens={{ childrenGap: 12 }}
       styles={{
         root: {
-          padding: 16,
-          borderRadius: 8,
+          padding: 20,
+          borderRadius: 12,
           backgroundColor: colors.bgCard,
-          border: `1px solid ${theme.semanticColors.bodyDivider}`,
+          border: `1px solid ${isClockedIn ? colors.textSuccess : theme.semanticColors.bodyDivider}`,
+          borderTop: isClockedIn ? `3px solid ${colors.textSuccess}` : `3px solid ${theme.palette.themePrimary}`,
           height: "100%",
           boxSizing: "border-box",
+          transition: "border-color 0.3s ease, border-top-color 0.3s ease",
         },
       }}
     >
-      <Text variant="mediumPlus" styles={{ root: { fontWeight: 600 } }}>
-        Clock In / Out
-      </Text>
+      {/* Header with status dot */}
+      <Stack horizontal verticalAlign="center" tokens={{ childrenGap: 8 }}>
+        <Icon iconName="Clock" styles={{ root: { fontSize: 16, color: theme.palette.themePrimary } }} />
+        <Text variant="mediumPlus" styles={{ root: { fontWeight: 600, flexGrow: 1 } }}>
+          Clock In / Out
+        </Text>
+        <Stack horizontal verticalAlign="center" tokens={{ childrenGap: 6 }}>
+          <div className={isClockedIn ? pulseDotClass : inactiveDotClass} />
+          <Text
+            variant="small"
+            styles={{
+              root: {
+                fontWeight: 600,
+                color: isClockedIn ? colors.textSuccess : colors.textTertiary,
+                textTransform: "uppercase",
+                fontSize: 11,
+                letterSpacing: "0.5px",
+              },
+            }}
+          >
+            {isClockedIn ? "Active" : "Inactive"}
+          </Text>
+        </Stack>
+      </Stack>
 
       {error && <ErrorMessage message={error} />}
 
-      <Stack tokens={{ childrenGap: 4 }}>
-        <Text variant="small" styles={{ root: { color: colors.textSecondary } }}>
-          Status:{" "}
-          <strong style={{ color: isClockedIn ? colors.textSuccess : colors.textSecondary }}>
-            {isClockedIn ? "Clocked In" : "Not Clocked In"}
-          </strong>
-        </Text>
-        {isClockedIn && activeClockEntry?.ClockIn && (
-          <Text variant="small" styles={{ root: { color: colors.textSecondary } }}>
-            Since: {formatTime(activeClockEntry.ClockIn)}
-          </Text>
-        )}
-      </Stack>
+      {/* Elapsed time display */}
+      <div className={isClockedIn ? elapsedDisplayClass : idleDisplayClass}>
+        {formatTimerDisplay(elapsedSeconds)}
+      </div>
 
-      <Stack horizontal tokens={{ childrenGap: 8 }}>
+      {/* Clock-in time info */}
+      {isClockedIn && activeClockEntry?.ClockIn && (
+        <Text
+          variant="small"
+          styles={{ root: { color: colors.textSecondary, textAlign: "center" } }}
+        >
+          Clocked in at {formatTime(activeClockEntry.ClockIn)}
+        </Text>
+      )}
+
+      {/* Action button */}
+      <Stack horizontalAlign="center" styles={{ root: { paddingTop: 4 } }}>
         {!isClockedIn ? (
           <PrimaryButton
             text="Clock In"
             iconProps={{ iconName: "Play" }}
             onClick={handleClockIn}
             disabled={loading}
+            styles={{
+              root: {
+                minWidth: 140,
+                height: 40,
+                borderRadius: 6,
+              },
+            }}
           />
         ) : (
           <DefaultButton
             text="Clock Out"
-            iconProps={{ iconName: "Stop" }}
+            iconProps={{ iconName: "CircleStop" }}
             onClick={handleClockOut}
             disabled={loading}
             styles={{
-              root: { borderColor: colors.borderError, color: colors.borderError },
-              rootHovered: { borderColor: colors.borderErrorHover, color: colors.borderErrorHover },
+              root: {
+                minWidth: 140,
+                height: 40,
+                borderRadius: 6,
+                borderColor: colors.borderError,
+                color: colors.borderError,
+              },
+              rootHovered: {
+                borderColor: colors.borderErrorHover,
+                color: colors.borderErrorHover,
+                backgroundColor: `${colors.borderError}10`,
+              },
             }}
           />
         )}

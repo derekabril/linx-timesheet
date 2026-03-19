@@ -22,6 +22,7 @@ import { ProjectForm } from "./ProjectForm";
 import { ProjectDetail } from "./ProjectDetail";
 import { Dropdown, IDropdownOption } from "@fluentui/react/lib/Dropdown";
 import { useAppTheme } from "../../hooks/useAppTheme";
+import { getDivisionOptions, getAreaOptions } from "../../utils/divisions";
 
 interface IProjectListProps {
   pageSize?: number;
@@ -41,6 +42,8 @@ export const ProjectList: React.FC<IProjectListProps> = ({ pageSize = 10 }) => {
   );
 
   const [searchText, setSearchText] = React.useState("");
+  const [filterDivision, setFilterDivision] = React.useState<string>("");
+  const [filterArea, setFilterArea] = React.useState<string>("");
   const [showForm, setShowForm] = React.useState(false);
   const [editProject, setEditProject] = React.useState<IProject | undefined>();
   const [selectedProject, setSelectedProject] = React.useState<IProject | null>(null);
@@ -48,7 +51,18 @@ export const ProjectList: React.FC<IProjectListProps> = ({ pageSize = 10 }) => {
   const [currentPage, setCurrentPage] = React.useState(1);
   const [itemsPerPage, setItemsPerPage] = React.useState(pageSize);
 
+  const divisionOptions: IDropdownOption[] = [
+    { key: "", text: "All Divisions" },
+    ...getDivisionOptions(),
+  ];
+  const areaOptions: IDropdownOption[] = [
+    { key: "", text: "All Areas" },
+    ...(filterDivision ? getAreaOptions(filterDivision) : []),
+  ];
+
   const filteredProjects = projects.filter((p) => {
+    if (filterDivision && p.Division !== filterDivision) return false;
+    if (filterArea && p.Area !== filterArea) return false;
     const search = searchText.toLowerCase();
     return (
       (p.Title || "").toLowerCase().includes(search) ||
@@ -66,10 +80,10 @@ export const ProjectList: React.FC<IProjectListProps> = ({ pageSize = 10 }) => {
     safePage * itemsPerPage
   );
 
-  // Reset to page 1 when search changes
+  // Reset to page 1 when filters change
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [searchText]);
+  }, [searchText, filterDivision, filterArea]);
 
   const pageSizeOptions: IDropdownOption[] = [
     { key: 10, text: "10" },
@@ -239,14 +253,36 @@ export const ProjectList: React.FC<IProjectListProps> = ({ pageSize = 10 }) => {
     <Stack tokens={{ childrenGap: 12 }} styles={{ root: { paddingTop: 16 } }}>
       {error && <ErrorMessage message={error} />}
 
-      <CommandBar items={commandItems} />
+      <CommandBar items={commandItems} styles={{ root: { paddingLeft: 0 } }} />
 
-      <SearchBox
-        placeholder="Search projects..."
-        value={searchText}
-        onChange={(_, val) => setSearchText(val || "")}
-        styles={{ root: { maxWidth: 300 } }}
-      />
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
+        <SearchBox
+          placeholder="Search projects..."
+          value={searchText}
+          onChange={(_, val) => setSearchText(val || "")}
+          styles={{ root: { width: 250, height: 32 } }}
+        />
+        <Dropdown
+          placeholder="All Divisions"
+          options={divisionOptions}
+          selectedKey={filterDivision}
+          onChange={(_, opt) => {
+            setFilterDivision((opt?.key as string) || "");
+            setFilterArea("");
+          }}
+          styles={{ root: { width: 220 }, dropdown: { height: 32 } }}
+          ariaLabel="Filter by Division"
+        />
+        <Dropdown
+          placeholder="All Areas"
+          options={areaOptions}
+          selectedKey={filterArea}
+          onChange={(_, opt) => setFilterArea((opt?.key as string) || "")}
+          disabled={!filterDivision}
+          styles={{ root: { width: 220 }, dropdown: { height: 32 } }}
+          ariaLabel="Filter by Area"
+        />
+      </div>
 
       <DetailsList
         items={pagedProjects}

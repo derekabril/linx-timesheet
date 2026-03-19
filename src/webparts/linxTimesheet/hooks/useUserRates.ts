@@ -49,5 +49,21 @@ export const useUserRates = () => {
     [rates]
   );
 
-  return { rates, loading, error, refresh, create, update, remove, getRateForUser };
+  const getMaxHoursForUser = useCallback(
+    (userId: number): number => {
+      const rate = rates.find((r) => r.EmployeeId === userId);
+      return rate?.MaxHoursPerDay ?? 0;
+    },
+    [rates]
+  );
+
+  const getContractTypeForUser = useCallback(
+    (userId: number): string => {
+      const rate = rates.find((r) => r.EmployeeId === userId);
+      return rate?.ContractType ?? "Regular";
+    },
+    [rates]
+  );
+
+  return { rates, loading, error, refresh, create, update, remove, getRateForUser, getMaxHoursForUser, getContractTypeForUser };
 };

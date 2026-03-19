@@ -3,6 +3,7 @@ import "@pnp/sp/site-users";
 import { IAuditLogEntry, IAuditLogCreate } from "../models/IAuditLogEntry";
 import { AuditAction } from "../models/enums";
 import { LIST_NAMES } from "../utils/constants";
+import { fetchAllItems } from "../utils/spPaging";
 
 export class AuditService {
   private sp: SPFI;
@@ -30,6 +31,7 @@ export class AuditService {
       .items.add({
         ...entry,
         PerformedById: userId,
+        ActionDate: new Date().toISOString(),
         Year: new Date().getFullYear(),
       });
   }
@@ -128,5 +130,28 @@ export class AuditService {
     }
 
     return query();
+  }
+
+  /**
+   * Delete audit log entries created before the given date.
+   * Returns the number of entries deleted.
+   */
+  public async purgeOlderThan(cutoffDate: Date): Promise<number> {
+    const cutoff = cutoffDate.toISOString();
+    const list = this.sp.web.lists.getByTitle(LIST_NAMES.AUDIT_LOG);
+
+    // Use ActionDate (indexed) for the filter to avoid threshold issues
+    const query = list.items
+      .filter(`ActionDate lt '${cutoff}'`)
+      .select("Id")
+      .top(500);
+    const items = await fetchAllItems<{ Id: number }>(query);
+
+    // Delete in batches to avoid throttling
+    for (const item of items) {
+      await list.items.getById(item.Id).recycle();
+    }
+
+    return items.length;
   }
 }

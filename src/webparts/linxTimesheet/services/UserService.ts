@@ -19,65 +19,60 @@ export class UserService {
   }
 
   /**
-   * Get the current logged-in user's details.
+   * Lightweight: get current user basics (single API call).
    */
-  public async getCurrentUser(): Promise<IUser> {
+  public async getCurrentUser(): Promise<{ id: number; displayName: string; email: string }> {
     const user = await this.sp.web.currentUser();
-    const profile = await this.sp.profiles.myProperties();
+    return { id: user.Id, displayName: user.Title, email: user.Email };
+  }
 
+  /**
+   * Load current user info, manager status, and site owner status in
+   * as few round trips as possible.
+   */
+  public async getCurrentUserWithRoles(): Promise<{
+    user: IUser;
+    isManager: boolean;
+    isSiteOwner: boolean;
+  }> {
+    // Batch 1: independent calls in parallel
+    const [spUser, profile, ownerGroupInfo] = await Promise.all([
+      this.sp.web.currentUser(),
+      this.sp.profiles.myProperties(),
+      this.sp.web.associatedOwnerGroup().catch(() => null),
+    ]);
+
+    // Batch 2: dependent calls in parallel
     const managerLogin = profile.UserProfileProperties?.find(
       (p: { Key: string; Value: string }) => p.Key === "Manager"
     )?.Value;
 
-    let managerId: number | null = null;
-    let managerTitle: string | null = null;
+    const directReports = (profile as { DirectReports?: string[] }).DirectReports ?? [];
 
-    if (managerLogin) {
-      try {
-        const managerUser = await this.sp.web.ensureUser(managerLogin);
-        managerId = managerUser.Id;
-        managerTitle = managerUser.Title;
-      } catch {
-        // Manager not found in site
-      }
-    }
+    const managerPromise = managerLogin
+      ? this.sp.web.ensureUser(managerLogin).catch(() => null)
+      : Promise.resolve(null);
+
+    const ownersPromise = ownerGroupInfo
+      ? this.sp.web.siteGroups.getById(ownerGroupInfo.Id).users().catch(() => [])
+      : Promise.resolve([]);
+
+    const [managerUser, owners] = await Promise.all([managerPromise, ownersPromise]);
 
     return {
-      id: user.Id,
-      loginName: user.LoginName,
-      displayName: user.Title,
-      email: user.Email,
-      jobTitle: profile.Title || "",
-      managerId,
-      managerTitle,
-      isSiteAdmin: user.IsSiteAdmin,
+      user: {
+        id: spUser.Id,
+        loginName: spUser.LoginName,
+        displayName: spUser.Title,
+        email: spUser.Email,
+        jobTitle: profile.Title || "",
+        managerId: managerUser?.Id ?? null,
+        managerTitle: managerUser?.Title ?? null,
+        isSiteAdmin: spUser.IsSiteAdmin,
+      },
+      isManager: directReports.length > 0,
+      isSiteOwner: (owners as { Id: number }[]).some((o) => o.Id === spUser.Id),
     };
-  }
-
-  /**
-   * Check if the current user is a manager (has direct reports).
-   */
-  public async isManager(): Promise<boolean> {
-    try {
-      const reports = await this.sp.profiles.myProperties.select("DirectReports")();
-      return ((reports as { DirectReports?: string[] }).DirectReports?.length ?? 0) > 0;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Check if the current user is a member of the site's Owners group.
-   */
-  public async isSiteOwner(): Promise<boolean> {
-    try {
-      const ownerGroup = await this.sp.web.associatedOwnerGroup();
-      const owners = await this.sp.web.siteGroups.getById(ownerGroup.Id).users();
-      const currentUser = await this.sp.web.currentUser();
-      return owners.some((o: { Id: number }) => o.Id === currentUser.Id);
-    } catch {
-      return false;
-    }
   }
 
   /**

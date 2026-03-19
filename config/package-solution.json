@@ -21,6 +21,12 @@
       "videoUrl": "",
       "categories": []
     },
+    "webApiPermissionRequests": [
+      {
+        "resource": "Microsoft Graph",
+        "scope": "Mail.Send"
+      }
+    ],
     "features": [
       {
         "title": "Keystone Pulse Feature",

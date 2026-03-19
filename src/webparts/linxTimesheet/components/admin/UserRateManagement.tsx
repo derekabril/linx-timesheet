@@ -13,10 +13,12 @@ import { SpinButton } from "@fluentui/react/lib/SpinButton";
 import { Label } from "@fluentui/react/lib/Label";
 import { NormalPeoplePicker } from "@fluentui/react/lib/Pickers";
 import { IPersonaProps } from "@fluentui/react/lib/Persona";
+import { Dropdown, IDropdownOption } from "@fluentui/react/lib/Dropdown";
 import { Dialog, DialogType, DialogFooter } from "@fluentui/react/lib/Dialog";
 import { MessageBar, MessageBarType } from "@fluentui/react/lib/MessageBar";
 import { useUserRates } from "../../hooks/useUserRates";
 import { IUserRate } from "../../models/IUserRate";
+import { ContractType } from "../../models/enums";
 import { LoadingSpinner } from "../common/LoadingSpinner";
 import { ErrorMessage } from "../common/ErrorMessage";
 import { UserService, ISiteUser } from "../../services/UserService";
@@ -41,6 +43,8 @@ export const UserRateManagement: React.FC = () => {
   // Form state
   const [selectedUser, setSelectedUser] = React.useState<IPersonaProps[]>([]);
   const [hourlyRate, setHourlyRate] = React.useState(0);
+  const [maxHoursPerDay, setMaxHoursPerDay] = React.useState(8);
+  const [contractType, setContractType] = React.useState<string>(ContractType.Regular);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
 
@@ -48,6 +52,8 @@ export const UserRateManagement: React.FC = () => {
     setEditRate(null);
     setSelectedUser([]);
     setHourlyRate(0);
+    setMaxHoursPerDay(8);
+    setContractType(ContractType.Regular);
     setFormError(null);
     setShowForm(true);
   };
@@ -59,6 +65,8 @@ export const UserRateManagement: React.FC = () => {
       text: rate.EmployeeTitle || rate.Title,
     }]);
     setHourlyRate(rate.HourlyRate);
+    setMaxHoursPerDay(rate.MaxHoursPerDay || 8);
+    setContractType(rate.ContractType || ContractType.Regular);
     setFormError(null);
     setShowForm(true);
   };
@@ -90,17 +98,23 @@ export const UserRateManagement: React.FC = () => {
       setFormError("Hourly rate must be greater than 0.");
       return;
     }
+    if (maxHoursPerDay <= 0) {
+      setFormError("Max hours per day must be greater than 0.");
+      return;
+    }
     setFormError(null);
     setSaving(true);
     try {
       if (editRate) {
-        await update(editRate.Id, { HourlyRate: hourlyRate });
+        await update(editRate.Id, { HourlyRate: hourlyRate, MaxHoursPerDay: maxHoursPerDay, ContractType: contractType });
       } else {
         const userId = Number(selectedUser[0].key);
         await create({
           Title: selectedUser[0].text || "",
           EmployeeId: userId,
           HourlyRate: hourlyRate,
+          MaxHoursPerDay: maxHoursPerDay,
+          ContractType: contractType,
         });
       }
       setShowForm(false);
@@ -125,6 +139,20 @@ export const UserRateManagement: React.FC = () => {
       minWidth: 100,
       maxWidth: 140,
       onRender: (item: IUserRate) => `$${item.HourlyRate.toFixed(2)}`,
+    },
+    {
+      key: "maxHours",
+      name: "Max Hours/Day",
+      minWidth: 100,
+      maxWidth: 130,
+      onRender: (item: IUserRate) => item.MaxHoursPerDay ? `${item.MaxHoursPerDay}h` : "--",
+    },
+    {
+      key: "contractType",
+      name: "Contract Type",
+      minWidth: 100,
+      maxWidth: 130,
+      onRender: (item: IUserRate) => item.ContractType || "Regular",
     },
     {
       key: "actions",
@@ -222,6 +250,23 @@ export const UserRateManagement: React.FC = () => {
               step={5}
               value={String(hourlyRate)}
               onChange={(_, v) => setHourlyRate(Number(v) || 0)}
+            />
+            <SpinButton
+              label="Max Billable Hours Per Day"
+              min={0.5}
+              max={24}
+              step={0.5}
+              value={String(maxHoursPerDay)}
+              onChange={(_, v) => setMaxHoursPerDay(Number(v) || 8)}
+            />
+            <Dropdown
+              label="Contract Type"
+              selectedKey={contractType}
+              options={[
+                { key: ContractType.Regular, text: "Regular" },
+                { key: ContractType.Contractual, text: "Contractual" },
+              ] as IDropdownOption[]}
+              onChange={(_, opt) => setContractType((opt?.key as string) || ContractType.Regular)}
             />
           </Stack>
         </Panel>

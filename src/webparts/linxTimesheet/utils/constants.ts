@@ -8,6 +8,8 @@ export const LIST_NAMES = {
   CONFIGURATION: "LinxConfiguration",
   HOLIDAYS: "LinxHolidays",
   USER_RATES: "LinxUserRates",
+  INCENTIVES: "LinxIncentives",
+  INCENTIVE_ASSIGNMENTS: "LinxIncentiveAssignments",
 } as const;
 
 export const TIME_ENTRY_FIELDS = {

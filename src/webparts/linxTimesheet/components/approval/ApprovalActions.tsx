@@ -4,14 +4,16 @@ import { Stack } from "@fluentui/react/lib/Stack";
 import { TextField } from "@fluentui/react/lib/TextField";
 import { MessageBar, MessageBarType } from "@fluentui/react/lib/MessageBar";
 import { useSubmissions } from "../../hooks/useSubmissions";
+import { ITimesheetSubmission } from "../../models/ITimesheetSubmission";
 import { useAppTheme } from "../../hooks/useAppTheme";
 
 interface IApprovalActionsProps {
   submissionId: number;
+  submission?: ITimesheetSubmission;
   onComplete: () => void;
 }
 
-export const ApprovalActions: React.FC<IApprovalActionsProps> = ({ submissionId, onComplete }) => {
+export const ApprovalActions: React.FC<IApprovalActionsProps> = ({ submissionId, submission, onComplete }) => {
   const { approve, reject, loading } = useSubmissions();
   const { colors } = useAppTheme();
   const [comments, setComments] = React.useState("");
@@ -20,7 +22,7 @@ export const ApprovalActions: React.FC<IApprovalActionsProps> = ({ submissionId,
   const handleApprove = async (): Promise<void> => {
     setError(null);
     try {
-      await approve(submissionId, comments);
+      await approve(submissionId, comments, submission);
       onComplete();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to approve");
@@ -34,7 +36,7 @@ export const ApprovalActions: React.FC<IApprovalActionsProps> = ({ submissionId,
     }
     setError(null);
     try {
-      await reject(submissionId, comments);
+      await reject(submissionId, comments, submission);
       onComplete();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to reject");

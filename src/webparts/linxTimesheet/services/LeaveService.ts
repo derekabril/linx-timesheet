@@ -1,6 +1,7 @@
 import { SPFI } from "@pnp/sp";
 import { ILeaveRequest, ILeaveRequestCreate } from "../models/ILeaveRequest";
 import { LIST_NAMES, MAX_ITEMS_PER_QUERY } from "../utils/constants";
+import { fetchAllItems } from "../utils/spPaging";
 
 const LEAVE_SELECT = [
   "Id", "Title", "EmployeeId", "Employee/Title", "LeaveType",
@@ -38,13 +39,14 @@ export class LeaveService {
   }
 
   public async getAllPending(): Promise<ILeaveRequest[]> {
-    return this.sp.web.lists
+    const query = this.sp.web.lists
       .getByTitle(LIST_NAMES.LEAVE_REQUESTS)
       .items.filter(`Status eq 'Submitted'`)
       .select(...LEAVE_SELECT)
       .expand(...LEAVE_EXPAND)
       .orderBy("RequestDate", false)
-      .top(MAX_ITEMS_PER_QUERY)();
+      .top(MAX_ITEMS_PER_QUERY);
+    return fetchAllItems(query);
   }
 
   public async create(request: ILeaveRequestCreate): Promise<ILeaveRequest> {

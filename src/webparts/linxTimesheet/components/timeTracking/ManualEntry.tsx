@@ -14,17 +14,19 @@ import { useTasks } from "../../hooks/useTasks";
 import { validateTimeEntry } from "../../utils/validationUtils";
 import { EntryType } from "../../models/enums";
 import { ErrorMessage } from "../common/ErrorMessage";
+import { useAppTheme } from "../../hooks/useAppTheme";
 
 export const ManualEntry: React.FC = React.memo(() => {
   const { currentUser, configuration } = useAppContext();
   const { refreshTodayEntries, refreshWeekEntries } = useTimesheetContext();
   const { createManualEntry, loading, error } = useTimeEntries();
+  const { colors } = useAppTheme();
   const { projects } = useProjects(
     currentUser ? { activeOnly: true, teamMemberUserId: currentUser.id } : true
   );
 
   const [entryDate, setEntryDate] = React.useState<Date>(new Date());
-  const [startTime, setStartTime] = React.useState("09:00");
+  const [startTime, setStartTime] = React.useState("08:00");
   const [endTime, setEndTime] = React.useState("17:00");
   const [breakMinutes, setBreakMinutes] = React.useState(configuration.defaultBreakMinutes);
   const [projectId, setProjectId] = React.useState<number | null>(null);
@@ -85,7 +87,10 @@ export const ManualEntry: React.FC = React.memo(() => {
   };
 
   return (
-    <Stack tokens={{ childrenGap: 12 }}>
+    <Stack
+      tokens={{ childrenGap: 12 }}
+      styles={{ root: { padding: 16, borderRadius: 8, backgroundColor: colors.bgSection } }}
+    >
       <Text variant="mediumPlus" styles={{ root: { fontWeight: 600 } }}>
         Manual Time Entry
       </Text>
@@ -107,7 +112,7 @@ export const ManualEntry: React.FC = React.memo(() => {
         </MessageBar>
       )}
 
-      <Stack horizontal tokens={{ childrenGap: 12 }} wrap>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
         <DatePicker
           label="Date"
           value={entryDate}
@@ -140,14 +145,15 @@ export const ManualEntry: React.FC = React.memo(() => {
           onChange={(_, val) => setBreakMinutes(Number(val) || 0)}
           styles={{ root: { width: 120 } }}
         />
-      </Stack>
+      </div>
 
-      <Stack horizontal tokens={{ childrenGap: 12 }} wrap>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
         <Dropdown
           label="Project"
           placeholder="Select project"
           options={projectOptions}
           selectedKey={projectId ?? ""}
+          dropdownWidth="auto"
           onChange={(_, opt) => {
             setProjectId(opt && opt.key !== "" ? (opt.key as number) : null);
             setTaskId(null);
@@ -160,11 +166,12 @@ export const ManualEntry: React.FC = React.memo(() => {
             placeholder="Select task"
             options={taskOptions}
             selectedKey={taskId ?? ""}
+            dropdownWidth="auto"
             onChange={(_, opt) => setTaskId(opt && opt.key !== "" ? (opt.key as number) : null)}
             styles={{ root: { width: 250 } }}
           />
         )}
-      </Stack>
+      </div>
 
       <TextField
         label="Notes"

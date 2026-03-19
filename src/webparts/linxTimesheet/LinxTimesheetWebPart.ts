@@ -8,6 +8,7 @@ import {
 } from "@microsoft/sp-property-pane";
 import App from "./components/App";
 import { getSP } from "./services/PnPConfig";
+import { getGraphClient } from "./services/GraphConfig";
 
 export interface ILinxTimesheetWebPartProps {
   title: string;
@@ -30,9 +31,16 @@ export default class LinxTimesheetWebPart extends BaseClientSideWebPart<ILinxTim
     }
 
     getSP(this.context, siteUrl);
+    await getGraphClient(this.context);
   }
 
   public render(): void {
+    // Remove thick top margin from SharePoint's ControlZone wrapper
+    const controlZone = this.domElement.closest(".ControlZone") as HTMLElement | null;
+    if (controlZone) {
+      controlZone.style.marginTop = "0";
+    }
+
     const element = React.createElement(App, {
       context: this.context,
       title: this.properties.title || "Keystone Pulse",

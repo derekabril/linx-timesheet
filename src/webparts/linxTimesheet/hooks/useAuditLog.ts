@@ -33,5 +33,22 @@ export const useAuditLog = () => {
     [service]
   );
 
-  return { entries, loading, error, search };
+  const purge = useCallback(
+    async (cutoffDate: Date): Promise<number> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const count = await service.purgeOlderThan(cutoffDate);
+        return count;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to purge audit log");
+        return 0;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [service]
+  );
+
+  return { entries, loading, error, search, purge };
 };

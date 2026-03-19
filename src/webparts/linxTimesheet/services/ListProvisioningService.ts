@@ -67,12 +67,15 @@ export class ListProvisioningService {
       this.ensureList(LIST_NAMES.CONFIGURATION, this.configurationFields()),
       this.ensureList(LIST_NAMES.HOLIDAYS, this.holidaysFields()),
       this.ensureList(LIST_NAMES.USER_RATES, this.userRatesFields()),
+      this.ensureList(LIST_NAMES.INCENTIVES, this.incentivesFields()),
+      this.ensureList(LIST_NAMES.INCENTIVE_ASSIGNMENTS, this.incentiveAssignmentsFields()),
     ]);
 
     // Create lookup fields after all lists exist
     await this.ensureLookupFields();
 
     await this.seedDefaultConfiguration();
+    await this.seedDefaultIncentives();
   }
 
   /**
@@ -81,12 +84,43 @@ export class ListProvisioningService {
    */
   private async ensureMigrations(): Promise<void> {
     const projectsList = this.sp.web.lists.getByTitle(LIST_NAMES.PROJECTS);
-    await this.addField(projectsList, { name: "TeamMembers", type: "UserMulti" });
-    await this.addField(projectsList, { name: "Division", type: "Text", indexed: true });
-    await this.addField(projectsList, { name: "Area", type: "Text", indexed: true });
+    const holidaysList = this.sp.web.lists.getByTitle(LIST_NAMES.HOLIDAYS);
 
-    // Ensure UserRates list exists for existing deployments
-    await this.ensureList(LIST_NAMES.USER_RATES, this.userRatesFields());
+    // Run independent list ensures and field additions in parallel
+    await Promise.all([
+      // Projects fields
+      this.addField(projectsList, { name: "TeamMembers", type: "UserMulti" }),
+      this.addField(projectsList, { name: "Division", type: "Text", indexed: true }),
+      this.addField(projectsList, { name: "Area", type: "Text", indexed: true }),
+      // UserRates list + fields
+      this.ensureList(LIST_NAMES.USER_RATES, this.userRatesFields()),
+      // Holidays field
+      this.addField(holidaysList, { name: "Category", type: "Choice", choices: ["Regular", "Special"] }),
+      // Incentive lists
+      this.ensureList(LIST_NAMES.INCENTIVES, this.incentivesFields()),
+      this.ensureList(LIST_NAMES.INCENTIVE_ASSIGNMENTS, this.incentiveAssignmentsFields()),
+    ]);
+
+    // Fields that depend on lists existing above
+    const userRatesList = this.sp.web.lists.getByTitle(LIST_NAMES.USER_RATES);
+    const submissionsList = this.sp.web.lists.getByTitle(LIST_NAMES.SUBMISSIONS);
+    const timeEntriesList = this.sp.web.lists.getByTitle(LIST_NAMES.TIME_ENTRIES);
+    await Promise.all([
+      this.addField(userRatesList, { name: "MaxHoursPerDay", type: "Number" }),
+      this.addField(userRatesList, { name: "ContractType", type: "Choice", choices: ["Regular", "Contractual"] }),
+      this.addLookupField({
+        sourceList: LIST_NAMES.INCENTIVE_ASSIGNMENTS,
+        fieldName: "Incentive",
+        lookupList: LIST_NAMES.INCENTIVES,
+        lookupField: "Title",
+        indexed: true,
+      }),
+      this.seedDefaultIncentives(),
+      // Scalability indexes for existing deployments
+      this.ensureFieldIndexed(submissionsList, "SubmittedDate"),
+      this.ensureFieldIndexed(submissionsList, "ApprovedDate"),
+      this.ensureFieldIndexed(timeEntriesList, "Submission"),
+    ]);
   }
 
   private async ensureList(title: string, fields: IFieldDef[]): Promise<void> {
@@ -174,8 +208,9 @@ export class ListProvisioningService {
     return [
       { sourceList: LIST_NAMES.TIME_ENTRIES, fieldName: "Project", lookupList: LIST_NAMES.PROJECTS, lookupField: "Title", indexed: true },
       { sourceList: LIST_NAMES.TIME_ENTRIES, fieldName: "Task", lookupList: LIST_NAMES.TASKS, lookupField: "Title" },
-      { sourceList: LIST_NAMES.TIME_ENTRIES, fieldName: "Submission", lookupList: LIST_NAMES.SUBMISSIONS, lookupField: "Title" },
+      { sourceList: LIST_NAMES.TIME_ENTRIES, fieldName: "Submission", lookupList: LIST_NAMES.SUBMISSIONS, lookupField: "Title", indexed: true },
       { sourceList: LIST_NAMES.TASKS, fieldName: "Project", lookupList: LIST_NAMES.PROJECTS, lookupField: "Title" },
+      { sourceList: LIST_NAMES.INCENTIVE_ASSIGNMENTS, fieldName: "Incentive", lookupList: LIST_NAMES.INCENTIVES, lookupField: "Title", indexed: true },
     ];
   }
 
@@ -212,6 +247,24 @@ export class ListProvisioningService {
       }
     } catch (e) {
       console.warn(`Failed to add lookup field ${def.fieldName} on ${def.sourceList}: ${e}`);
+    }
+  }
+
+  /**
+   * Ensure an existing field is indexed. Safe to call if already indexed.
+   */
+  private async ensureFieldIndexed(
+    list: ReturnType<typeof this.sp.web.lists.getByTitle>,
+    fieldName: string
+  ): Promise<void> {
+    try {
+      const field = list.fields.getByInternalNameOrTitle(fieldName);
+      const info = await field.select("Indexed")();
+      if (!info.Indexed) {
+        await field.update({ Indexed: true });
+      }
+    } catch (e) {
+      console.warn(`Failed to ensure index on ${fieldName}: ${e}`);
     }
   }
 
@@ -312,8 +365,8 @@ export class ListProvisioningService {
       { name: "RegularHours", type: "Number" },
       { name: "Status", type: "Choice", indexed: true, choices: ["Draft", "Submitted", "Approved", "Rejected", "Processed", "Cancelled"] },
       { name: "Approver", type: "User", indexed: true },
-      { name: "SubmittedDate", type: "DateTime" },
-      { name: "ApprovedDate", type: "DateTime" },
+      { name: "SubmittedDate", type: "DateTime", indexed: true },
+      { name: "ApprovedDate", type: "DateTime", indexed: true },
       { name: "ApproverComments", type: "Note" },
       { name: "WeekNumber", type: "Number", indexed: true },
       { name: "Year", type: "Number", indexed: true },
@@ -346,6 +399,7 @@ export class ListProvisioningService {
       { name: "HolidayDate", type: "DateTime", dateOnly: true, indexed: true },
       { name: "Year", type: "Number", indexed: true },
       { name: "IsRecurring", type: "Boolean" },
+      { name: "Category", type: "Choice", choices: ["Regular", "Special"] },
     ];
   }
 
@@ -353,6 +407,58 @@ export class ListProvisioningService {
     return [
       { name: "Employee", type: "User", indexed: true },
       { name: "HourlyRate", type: "Currency" },
+      { name: "MaxHoursPerDay", type: "Number" },
+      { name: "ContractType", type: "Choice", choices: ["Regular", "Contractual"] },
     ];
+  }
+
+  private incentivesFields(): IFieldDef[] {
+    return [
+      { name: "Frequency", type: "Choice", indexed: true, choices: ["Daily", "Weekly", "Monthly"] },
+      { name: "Value", type: "Currency" },
+      { name: "IncentiveType", type: "Choice", indexed: true, choices: ["Individual", "Team", "Company"] },
+      { name: "IsActive", type: "Boolean" },
+    ];
+  }
+
+  private incentiveAssignmentsFields(): IFieldDef[] {
+    return [
+      { name: "Employee", type: "User", indexed: true },
+      // Incentive lookup is added in ensureLookupFields
+    ];
+  }
+
+  private async seedDefaultIncentives(): Promise<void> {
+    try {
+      const items = await this.sp.web.lists
+        .getByTitle(LIST_NAMES.INCENTIVES)
+        .items.top(1)();
+
+      if (items.length > 0) return; // Already seeded
+
+      const list = this.sp.web.lists.getByTitle(LIST_NAMES.INCENTIVES);
+      const defaults = [
+        { Title: "Individual Task Completion (8K)", Frequency: "Daily", Value: 8, IncentiveType: "Individual", IsActive: true },
+        { Title: "Individual Task Completion (3JR)", Frequency: "Daily", Value: 3, IncentiveType: "Individual", IsActive: true },
+        { Title: "Team Task Completion", Frequency: "Daily", Value: 2, IncentiveType: "Team", IsActive: true },
+        { Title: "Team Task Completion", Frequency: "Daily", Value: 5, IncentiveType: "Team", IsActive: true },
+        { Title: "Standardized Documents (#)", Frequency: "Daily", Value: 2, IncentiveType: "Team", IsActive: true },
+        { Title: "Sits Kept (#)", Frequency: "Daily", Value: 2, IncentiveType: "Team", IsActive: true },
+        { Title: "Analysis Kept (#)", Frequency: "Daily", Value: 10, IncentiveType: "Team", IsActive: true },
+        { Title: "Weekly Analysis's (>5=$50)", Frequency: "Weekly", Value: 50, IncentiveType: "Team", IsActive: true },
+        { Title: "New Clients Signed (#)", Frequency: "Daily", Value: 100, IncentiveType: "Team", IsActive: true },
+        { Title: "$60K/Month Cash Collect (Y/N)", Frequency: "Monthly", Value: 500, IncentiveType: "Company", IsActive: true },
+        { Title: "LINX QBO Daily Accurate & Completed", Frequency: "Daily", Value: 2, IncentiveType: "Individual", IsActive: true },
+        { Title: "LINX Liquidity Lens Accurate & Delivered", Frequency: "Weekly", Value: 2, IncentiveType: "Individual", IsActive: true },
+        { Title: "All Client QBO Accurate & Complete", Frequency: "Daily", Value: 4, IncentiveType: "Team", IsActive: true },
+        { Title: "All Client Liquidity Lens Accurate & Complete", Frequency: "Weekly", Value: 2, IncentiveType: "Team", IsActive: true },
+      ];
+
+      for (const item of defaults) {
+        await list.items.add(item);
+      }
+    } catch (e) {
+      console.warn("Failed to seed default incentives:", e);
+    }
   }
 }

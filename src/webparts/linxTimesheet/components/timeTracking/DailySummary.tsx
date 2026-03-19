@@ -6,6 +6,7 @@ import { useAppContext } from "../../context/AppContext";
 import { useAppTheme } from "../../hooks/useAppTheme";
 import { formatHours } from "../../utils/hoursFormatter";
 import { EntryStatus } from "../../models/enums";
+import { calculateEffectiveHours } from "../../utils/effectiveHours";
 
 const statStyle: React.CSSProperties = {
   textAlign: "center",
@@ -19,7 +20,7 @@ export const DailySummary: React.FC = () => {
   const { colors } = useAppTheme();
 
   const completedEntries = todayEntries.filter((e) => e.Status !== EntryStatus.Voided);
-  const totalHours = completedEntries.reduce((sum, e) => sum + e.TotalHours, 0);
+  const totalHours = calculateEffectiveHours(completedEntries);
   const totalBreakMins = completedEntries.reduce((sum, e) => sum + e.BreakMinutes, 0);
   const overtimeHours = Math.max(0, totalHours - configuration.overtimeDailyThreshold);
   const regularHours = totalHours - overtimeHours;

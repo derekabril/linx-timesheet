@@ -4,6 +4,7 @@ export interface IHoliday {
   HolidayDate: string;
   Year: number;
   IsRecurring: boolean;
+  Category: string;
 }
 
 export interface IHolidayCreate {
@@ -11,4 +12,5 @@ export interface IHolidayCreate {
   HolidayDate: string;
   Year: number;
   IsRecurring: boolean;
+  Category: string;
 }

@@ -15,6 +15,7 @@ const defaultAppContext: IAppContext = {
   isManager: false,
   isAdmin: false,
   isSiteOwner: false,
+  isBookkeeper: false,
   configuration: DEFAULT_CONFIG,
   holidays: [],
   isLoading: true,
@@ -37,6 +38,7 @@ export const AppProvider: React.FC<IAppProviderProps> = ({ context, children }) 
   const [isManager, setIsManager] = React.useState(false);
   const [isAdmin, setIsAdmin] = React.useState(false);
   const [isSiteOwner, setIsSiteOwner] = React.useState(false);
+  const [isBookkeeper, setIsBookkeeper] = React.useState(false);
   const [configuration, setConfiguration] = React.useState<IAppConfiguration>(DEFAULT_CONFIG);
   const [holidays, setHolidays] = React.useState<IHoliday[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -63,25 +65,28 @@ export const AppProvider: React.FC<IAppProviderProps> = ({ context, children }) 
       try {
         setIsLoading(true);
 
-        // Provision lists on first load
+        // Run provisioning and user/config data loading in parallel
         const provisioner = new ListProvisioningService(sp);
-        await provisioner.ensureAllLists();
-
-        // Load user, config, holidays in parallel
-        const [user, manager, siteOwner, config, yearHolidays] = await Promise.all([
-          userService.getCurrentUser(),
-          userService.isManager(),
-          userService.isSiteOwner(),
+        const [, userRoles, config, yearHolidays] = await Promise.all([
+          provisioner.ensureAllLists(),
+          userService.getCurrentUserWithRoles(),
           configService.load(),
           holidayService.getByYear(new Date().getFullYear()),
         ]);
 
-        setCurrentUser(user);
-        setIsManager(manager);
-        setIsAdmin(user.isSiteAdmin);
-        setIsSiteOwner(siteOwner);
+        setCurrentUser(userRoles.user);
+        setIsManager(userRoles.isManager);
+        setIsAdmin(userRoles.user.isSiteAdmin);
+        setIsSiteOwner(userRoles.isSiteOwner);
         setConfiguration(config);
         setHolidays(yearHolidays);
+
+        // Determine bookkeeper role from config
+        const bkEmails = (config.bookkeeperEmails || "")
+          .split(",")
+          .map((e) => e.trim().toLowerCase())
+          .filter(Boolean);
+        setIsBookkeeper(bkEmails.includes(userRoles.user.email.toLowerCase()));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to initialize app.");
         console.error("AppContext init error:", err);
@@ -98,6 +103,7 @@ export const AppProvider: React.FC<IAppProviderProps> = ({ context, children }) 
     isManager,
     isAdmin,
     isSiteOwner,
+    isBookkeeper,
     configuration,
     holidays,
     isLoading,

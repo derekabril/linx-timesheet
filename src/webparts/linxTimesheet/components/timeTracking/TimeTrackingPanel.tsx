@@ -23,13 +23,13 @@ export const TimeTrackingPanel: React.FC = () => {
     <Stack tokens={{ childrenGap: 16 }} styles={{ root: { paddingTop: 16 } }}>
       {/* Top row: Clock In/Out + Timer + Break */}
       <Stack horizontal tokens={{ childrenGap: 16 }} wrap styles={{ root: { alignItems: "stretch" } }}>
-        <Stack.Item grow={1} styles={{ root: { minWidth: 250, flexBasis: 0 } }}>
+        <Stack.Item grow={1} styles={{ root: { minWidth: 280, flexBasis: 0 } }}>
           <ClockInOut />
         </Stack.Item>
-        <Stack.Item grow={1} styles={{ root: { minWidth: 250, flexBasis: 0 } }}>
+        <Stack.Item grow={1} styles={{ root: { minWidth: 280, flexBasis: 0 } }}>
           <Timer />
         </Stack.Item>
-        <Stack.Item grow={1} styles={{ root: { minWidth: 250, flexBasis: 0 } }}>
+        <Stack.Item grow={1} styles={{ root: { minWidth: 280, flexBasis: 0 } }}>
           <BreakTracker />
         </Stack.Item>
       </Stack>

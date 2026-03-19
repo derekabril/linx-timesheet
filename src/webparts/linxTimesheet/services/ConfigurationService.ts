@@ -44,6 +44,21 @@ export class ConfigurationService {
           // Keep defaults
         }
       }
+      if (configMap.has("RegularHolidayRate")) {
+        config.regularHolidayRate = Number(configMap.get("RegularHolidayRate"));
+      }
+      if (configMap.has("SpecialHolidayRate")) {
+        config.specialHolidayRate = Number(configMap.get("SpecialHolidayRate"));
+      }
+      if (configMap.has("NotificationEmail")) {
+        config.notificationEmail = configMap.get("NotificationEmail") || "";
+      }
+      if (configMap.has("CeoEmail")) {
+        config.ceoEmail = configMap.get("CeoEmail") || "";
+      }
+      if (configMap.has("BookkeeperEmails")) {
+        config.bookkeeperEmails = configMap.get("BookkeeperEmails") || "";
+      }
 
       return config;
     } catch {
@@ -88,5 +103,10 @@ export class ConfigurationService {
     await this.saveSetting("WorkingDaysPerWeek", String(config.workingDaysPerWeek), "General");
     await this.saveSetting("DefaultBreakMinutes", String(config.defaultBreakMinutes), "General");
     await this.saveSetting("LeaveBalances", JSON.stringify(config.leaveBalances), "Leave");
+    await this.saveSetting("RegularHolidayRate", String(config.regularHolidayRate), "Holiday");
+    await this.saveSetting("SpecialHolidayRate", String(config.specialHolidayRate), "Holiday");
+    await this.saveSetting("NotificationEmail", config.notificationEmail, "Workflow");
+    await this.saveSetting("CeoEmail", config.ceoEmail, "Workflow");
+    await this.saveSetting("BookkeeperEmails", config.bookkeeperEmails, "Workflow");
   }
 }

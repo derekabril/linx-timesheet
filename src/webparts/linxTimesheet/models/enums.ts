@@ -53,11 +53,34 @@ export enum SettingCategory {
   Workflow = "Workflow",
 }
 
+export enum ContractType {
+  Regular = "Regular",
+  Contractual = "Contractual",
+}
+
+export enum HolidayCategory {
+  Regular = "Regular",
+  Special = "Special",
+}
+
+export enum IncentiveFrequency {
+  Daily = "Daily",
+  Weekly = "Weekly",
+  Monthly = "Monthly",
+}
+
+export enum IncentiveType {
+  Individual = "Individual",
+  Team = "Team",
+  Company = "Company",
+}
+
 export enum AppTab {
   Timesheet = "timesheet",
   Projects = "projects",
   Leave = "leave",
   Approvals = "approvals",
   Reports = "reports",
+  Payroll = "payroll",
   Admin = "admin",
 }

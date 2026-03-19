@@ -25,9 +25,10 @@ import { useAppTheme } from "../../hooks/useAppTheme";
 interface ITimesheetReviewProps {
   submission: ITimesheetSubmission;
   onBack: () => void;
+  readOnly?: boolean;
 }
 
-export const TimesheetReview: React.FC<ITimesheetReviewProps> = ({ submission, onBack }) => {
+export const TimesheetReview: React.FC<ITimesheetReviewProps> = ({ submission, onBack, readOnly }) => {
   const [entries, setEntries] = React.useState<ITimeEntry[]>([]);
   const [loading, setLoading] = React.useState(true);
   const { colors } = useAppTheme();
@@ -147,11 +148,11 @@ export const TimesheetReview: React.FC<ITimesheetReviewProps> = ({ submission, o
         />
       )}
 
-      {submission.Status === "Submitted" && (
-        <ApprovalActions submissionId={submission.Id} onComplete={onBack} />
+      {!readOnly && submission.Status === "Submitted" && (
+        <ApprovalActions submissionId={submission.Id} submission={submission} onComplete={onBack} />
       )}
 
-      {submission.Status === "Approved" && (
+      {!readOnly && submission.Status === "Approved" && (
         <Stack tokens={{ childrenGap: 12 }} styles={{ root: { padding: "16px 0" } }}>
           {revokeError && <MessageBar messageBarType={MessageBarType.error}>{revokeError}</MessageBar>}
 

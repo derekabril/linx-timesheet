@@ -2,10 +2,11 @@ import * as React from "react";
 import { PrimaryButton, DefaultButton, IconButton } from "@fluentui/react/lib/Button";
 import { Stack } from "@fluentui/react/lib/Stack";
 import { Text } from "@fluentui/react/lib/Text";
+import { Icon } from "@fluentui/react/lib/Icon";
 import { Dropdown, IDropdownOption } from "@fluentui/react/lib/Dropdown";
 import { TextField } from "@fluentui/react/lib/TextField";
 import { Dialog, DialogType, DialogFooter } from "@fluentui/react/lib/Dialog";
-import { mergeStyles } from "@fluentui/react/lib/Styling";
+import { mergeStyles, keyframes } from "@fluentui/react/lib/Styling";
 import { useTimer as useTimerHook } from "../../hooks/useTimer";
 import { useTimeEntries } from "../../hooks/useTimeEntries";
 import { useProjects } from "../../hooks/useProjects";
@@ -15,12 +16,10 @@ import { useTimesheetContext } from "../../context/TimesheetContext";
 import { useAppTheme } from "../../hooks/useAppTheme";
 import { formatTimerDisplay } from "../../utils/hoursFormatter";
 
-const timerDisplayClass = mergeStyles({
-  fontSize: 36,
-  fontWeight: 700,
-  fontFamily: "'Courier New', monospace",
-  textAlign: "center",
-  padding: "8px 0",
+const blinkAnimation = keyframes({
+  "0%": { opacity: 1 },
+  "50%": { opacity: 0.3 },
+  "100%": { opacity: 1 },
 });
 
 export const Timer: React.FC = () => {
@@ -28,7 +27,9 @@ export const Timer: React.FC = () => {
   const { refreshTodayEntries, refreshWeekEntries } = useTimesheetContext();
   const timer = useTimerHook();
   const { createTimerEntry } = useTimeEntries();
-  const { projects } = useProjects();
+  const { projects } = useProjects(
+    currentUser ? { activeOnly: true, teamMemberUserId: currentUser.id } : true
+  );
   const { colors, theme } = useAppTheme();
   const [selectedProjectId, setSelectedProjectId] = React.useState<number | null>(null);
   const { tasks } = useTasks(selectedProjectId);
@@ -82,51 +83,158 @@ export const Timer: React.FC = () => {
     text: `${t.TaskCode} - ${t.Title}`,
   }));
 
+  // Determine visual state
+  const isIdle = !timer.isRunning && !timer.isPaused;
+  const accentColor = timer.isRunning
+    ? colors.textSuccess
+    : timer.isPaused
+    ? colors.textWarning
+    : theme.palette.neutralTertiary;
+
+  const statusLabel = timer.isRunning ? "Running" : timer.isPaused ? "Paused" : "Ready";
+
+  const timerDisplayClass = mergeStyles({
+    fontSize: 40,
+    fontWeight: 700,
+    fontFamily: "'Courier New', monospace",
+    textAlign: "center",
+    padding: "12px 0 4px",
+    letterSpacing: "3px",
+    color: isIdle ? colors.textTertiary : theme.semanticColors.bodyText,
+    animationName: timer.isPaused ? blinkAnimation : "none",
+    animationDuration: "1.5s",
+    animationIterationCount: "infinite",
+    animationTimingFunction: "ease-in-out",
+  });
+
+  const statusBadgeClass = mergeStyles({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+    padding: "2px 10px",
+    borderRadius: 12,
+    backgroundColor: `${accentColor}18`,
+    border: `1px solid ${accentColor}40`,
+    fontSize: 11,
+    fontWeight: 600,
+    color: accentColor,
+    textTransform: "uppercase",
+    letterSpacing: "0.5px",
+  });
+
   return (
     <Stack
-      tokens={{ childrenGap: 12 }}
+      tokens={{ childrenGap: 10 }}
       styles={{
         root: {
-          padding: 16,
-          borderRadius: 8,
+          padding: 20,
+          borderRadius: 12,
           backgroundColor: colors.bgCard,
-          border: `1px solid ${theme.semanticColors.bodyDivider}`,
+          border: `1px solid ${isIdle ? theme.semanticColors.bodyDivider : accentColor}`,
+          borderTop: `3px solid ${isIdle ? theme.palette.themePrimary : accentColor}`,
           height: "100%",
           boxSizing: "border-box",
+          transition: "border-color 0.3s ease, border-top-color 0.3s ease",
         },
       }}
     >
-      <Text variant="mediumPlus" styles={{ root: { fontWeight: 600 } }}>
-        Timer
-      </Text>
+      {/* Header with status badge */}
+      <Stack horizontal verticalAlign="center" tokens={{ childrenGap: 8 }}>
+        <Icon iconName="Timer" styles={{ root: { fontSize: 16, color: theme.palette.themePrimary } }} />
+        <Text variant="mediumPlus" styles={{ root: { fontWeight: 600, flexGrow: 1 } }}>
+          Timer
+        </Text>
+        <span className={statusBadgeClass}>{statusLabel}</span>
+      </Stack>
 
+      {/* Timer display */}
       <div className={timerDisplayClass}>{formatTimerDisplay(timer.elapsedSeconds)}</div>
 
-      <Stack horizontal horizontalAlign="center" tokens={{ childrenGap: 8 }}>
-        {!timer.isRunning && !timer.isPaused && (
-          <PrimaryButton text="Start" iconProps={{ iconName: "Play" }} onClick={timer.start} />
+      {/* Controls */}
+      <Stack horizontal horizontalAlign="center" tokens={{ childrenGap: 8 }} styles={{ root: { paddingTop: 4 } }}>
+        {isIdle && (
+          <PrimaryButton
+            text="Start"
+            iconProps={{ iconName: "Play" }}
+            onClick={timer.start}
+            styles={{
+              root: { minWidth: 120, height: 40, borderRadius: 6 },
+            }}
+          />
         )}
         {timer.isRunning && (
           <>
-            <DefaultButton text="Pause" iconProps={{ iconName: "Pause" }} onClick={timer.pause} />
+            <DefaultButton
+              text="Pause"
+              iconProps={{ iconName: "Pause" }}
+              onClick={timer.pause}
+              styles={{
+                root: {
+                  minWidth: 100,
+                  height: 40,
+                  borderRadius: 6,
+                  borderColor: colors.textWarning,
+                  color: colors.textWarning,
+                },
+                rootHovered: {
+                  backgroundColor: `${colors.textWarning}10`,
+                },
+              }}
+            />
             <DefaultButton
               text="Stop"
-              iconProps={{ iconName: "Stop" }}
+              iconProps={{ iconName: "CircleStop" }}
               onClick={handleStop}
-              styles={{ root: { borderColor: colors.borderError, color: colors.borderError } }}
+              styles={{
+                root: {
+                  minWidth: 100,
+                  height: 40,
+                  borderRadius: 6,
+                  borderColor: colors.borderError,
+                  color: colors.borderError,
+                },
+                rootHovered: {
+                  backgroundColor: `${colors.borderError}10`,
+                },
+              }}
             />
           </>
         )}
         {timer.isPaused && (
           <>
-            <PrimaryButton text="Resume" iconProps={{ iconName: "Play" }} onClick={timer.resume} />
+            <PrimaryButton
+              text="Resume"
+              iconProps={{ iconName: "Play" }}
+              onClick={timer.resume}
+              styles={{
+                root: { minWidth: 100, height: 40, borderRadius: 6 },
+              }}
+            />
             <DefaultButton
               text="Stop"
-              iconProps={{ iconName: "Stop" }}
+              iconProps={{ iconName: "CircleStop" }}
               onClick={handleStop}
-              styles={{ root: { borderColor: colors.borderError, color: colors.borderError } }}
+              styles={{
+                root: {
+                  minWidth: 100,
+                  height: 40,
+                  borderRadius: 6,
+                  borderColor: colors.borderError,
+                  color: colors.borderError,
+                },
+                rootHovered: {
+                  backgroundColor: `${colors.borderError}10`,
+                },
+              }}
             />
-            <IconButton iconProps={{ iconName: "Delete" }} title="Reset" onClick={timer.reset} />
+            <IconButton
+              iconProps={{ iconName: "Delete" }}
+              title="Reset"
+              onClick={timer.reset}
+              styles={{
+                root: { height: 40, width: 40, borderRadius: 6 },
+              }}
+            />
           </>
         )}
       </Stack>
@@ -139,6 +247,7 @@ export const Timer: React.FC = () => {
           options={projectOptions}
           selectedKey={selectedProjectId}
           onChange={(_, opt) => setSelectedProjectId(opt ? (opt.key as number) : null)}
+          styles={{ root: { marginTop: 4 } }}
         />
       )}
 

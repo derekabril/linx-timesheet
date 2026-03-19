@@ -61,7 +61,7 @@ export const useTimeEntries = () => {
         const entries = await service.getToday(0, toDateString(now)); // We'll get by ID
         const current = entries.find((e) => e.Id === entryId);
         const clockIn = current?.ClockIn || now.toISOString();
-        const totalHours = calculateHours(clockIn, now.toISOString());
+        const totalHours = calculateHours(clockIn, now.toISOString(), breakMinutes);
 
         const updates = {
           ClockOut: now.toISOString(),
@@ -105,7 +105,7 @@ export const useTimeEntries = () => {
         const dateStr = toDateString(date);
         const clockIn = new Date(`${dateStr}T${startTime}:00`).toISOString();
         const clockOut = new Date(`${dateStr}T${endTime}:00`).toISOString();
-        const totalHours = calculateHours(clockIn, clockOut);
+        const totalHours = calculateHours(clockIn, clockOut, breakMinutes);
 
         const entry: ITimeEntryCreate = {
           Title: `Manual-${dateStr}`,

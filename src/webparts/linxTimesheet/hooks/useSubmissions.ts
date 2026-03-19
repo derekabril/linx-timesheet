@@ -3,6 +3,8 @@ import { getSP } from "../services/PnPConfig";
 import { SubmissionService } from "../services/SubmissionService";
 import { TimeEntryService } from "../services/TimeEntryService";
 import { AuditService } from "../services/AuditService";
+import { NotificationService } from "../services/NotificationService";
+import { UserService } from "../services/UserService";
 import { ITimesheetSubmission, ITimesheetSubmissionCreate } from "../models/ITimesheetSubmission";
 import { ITimeEntry } from "../models/ITimeEntry";
 import { SubmissionStatus, AuditAction } from "../models/enums";
@@ -19,6 +21,8 @@ export const useSubmissions = () => {
   const submissionService = useMemo(() => new SubmissionService(sp), [sp]);
   const timeEntryService = useMemo(() => new TimeEntryService(sp), [sp]);
   const auditService = useMemo(() => new AuditService(sp), [sp]);
+  const notificationService = useMemo(() => new NotificationService(), []);
+  const userService = useMemo(() => new UserService(sp), [sp]);
 
   /**
    * Create and submit a weekly timesheet.
@@ -65,6 +69,27 @@ export const useSubmissions = () => {
           submission as unknown as Record<string, unknown>
         );
 
+        // Send notification email (non-blocking)
+        if (config.notificationEmail) {
+          const currentUser = await userService.getCurrentUser();
+          const entryDetails = entries.map((e) => ({
+            date: e.EntryDate,
+            clockIn: e.ClockIn,
+            clockOut: e.ClockOut,
+            totalHours: e.TotalHours,
+          }));
+          notificationService.notifySubmission(
+            config.notificationEmail,
+            currentUser.displayName,
+            weekNumber,
+            year,
+            overtime.totalHours,
+            entryDetails
+          ).catch((e) => console.warn("Submission notification failed:", e));
+        } else {
+          console.log("Skipping submission notification: no notificationEmail configured");
+        }
+
         return result;
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to submit timesheet");
@@ -73,11 +98,11 @@ export const useSubmissions = () => {
         setLoading(false);
       }
     },
-    [submissionService, timeEntryService, auditService]
+    [submissionService, timeEntryService, auditService, notificationService, userService]
   );
 
   const approve = useCallback(
-    async (submissionId: number, comments: string): Promise<void> => {
+    async (submissionId: number, comments: string, submission?: ITimesheetSubmission): Promise<void> => {
       setLoading(true);
       try {
         await submissionService.approve(submissionId, comments);
@@ -88,6 +113,20 @@ export const useSubmissions = () => {
           SubmissionStatus.Submitted,
           SubmissionStatus.Approved
         );
+
+        // Notify the employee (non-blocking)
+        if (submission?.EmployeeId) {
+          const users = await userService.getUsersByIds([submission.EmployeeId]);
+          if (users.length > 0 && users[0].Email) {
+            notificationService.notifyApproval(
+              users[0].Email,
+              users[0].Title,
+              submission.WeekNumber,
+              submission.Year,
+              comments
+            ).catch((e) => console.warn("Approval notification failed:", e));
+          }
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to approve");
         throw err;
@@ -95,11 +134,11 @@ export const useSubmissions = () => {
         setLoading(false);
       }
     },
-    [submissionService, auditService]
+    [submissionService, auditService, notificationService, userService]
   );
 
   const reject = useCallback(
-    async (submissionId: number, comments: string): Promise<void> => {
+    async (submissionId: number, comments: string, submission?: ITimesheetSubmission): Promise<void> => {
       setLoading(true);
       try {
         await submissionService.reject(submissionId, comments);
@@ -110,6 +149,20 @@ export const useSubmissions = () => {
           SubmissionStatus.Submitted,
           SubmissionStatus.Rejected
         );
+
+        // Notify the employee (non-blocking)
+        if (submission?.EmployeeId) {
+          const users = await userService.getUsersByIds([submission.EmployeeId]);
+          if (users.length > 0 && users[0].Email) {
+            notificationService.notifyRejection(
+              users[0].Email,
+              users[0].Title,
+              submission.WeekNumber,
+              submission.Year,
+              comments
+            ).catch((e) => console.warn("Rejection notification failed:", e));
+          }
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to reject");
         throw err;
@@ -117,7 +170,7 @@ export const useSubmissions = () => {
         setLoading(false);
       }
     },
-    [submissionService, auditService]
+    [submissionService, auditService, notificationService, userService]
   );
 
   const revokeApproval = useCallback(

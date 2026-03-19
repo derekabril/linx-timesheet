@@ -67,16 +67,17 @@ export function formatTime(dateTimeStr: string | null): string {
 }
 
 /**
- * Calculate hours between two datetime strings (break time is included in total).
+ * Calculate hours between two datetime strings, subtracting break time.
  */
 export function calculateHours(
   clockIn: string,
   clockOut: string,
+  breakMinutes: number = 0,
 ): number {
   const start = new Date(clockIn).getTime();
   const end = new Date(clockOut).getTime();
   const diffMs = end - start;
-  const diffHours = diffMs / (1000 * 60 * 60);
+  const diffHours = (diffMs / (1000 * 60 * 60)) - (breakMinutes / 60);
   return Math.max(0, Math.round(diffHours * 100) / 100);
 }
 

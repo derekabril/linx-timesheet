@@ -3,7 +3,7 @@ import { IUserRate, IUserRateCreate } from "../models/IUserRate";
 import { LIST_NAMES, MAX_ITEMS_PER_QUERY } from "../utils/constants";
 
 const USER_RATE_FIELDS = {
-  SELECT: ["Id", "Title", "EmployeeId", "Employee/Title", "HourlyRate"],
+  SELECT: ["Id", "Title", "EmployeeId", "Employee/Title", "HourlyRate", "MaxHoursPerDay", "ContractType"],
   EXPAND: ["Employee"],
 } as const;
 

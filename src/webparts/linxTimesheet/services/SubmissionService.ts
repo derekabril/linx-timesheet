@@ -1,6 +1,7 @@
 import { SPFI } from "@pnp/sp";
 import { ITimesheetSubmission, ITimesheetSubmissionCreate } from "../models/ITimesheetSubmission";
 import { LIST_NAMES, SUBMISSION_FIELDS, MAX_ITEMS_PER_QUERY } from "../utils/constants";
+import { fetchAllItems } from "../utils/spPaging";
 
 export class SubmissionService {
   private sp: SPFI;
@@ -70,30 +71,47 @@ export class SubmissionService {
 
   /**
    * Get all pending (submitted) submissions across all employees.
+   * Automatically pages through results to avoid truncation.
    */
   public async getAllPending(): Promise<ITimesheetSubmission[]> {
-    const items = await this.sp.web.lists
+    const query = this.sp.web.lists
       .getByTitle(LIST_NAMES.SUBMISSIONS)
       .items.filter(`Status eq 'Submitted'`)
       .select(...SUBMISSION_FIELDS.SELECT)
       .expand(...SUBMISSION_FIELDS.EXPAND)
       .orderBy("SubmittedDate", false)
-      .top(MAX_ITEMS_PER_QUERY)();
-    return SubmissionService.mapSubmissions(items);
+      .top(MAX_ITEMS_PER_QUERY);
+    return SubmissionService.mapSubmissions(await fetchAllItems(query));
+  }
+
+  /**
+   * Get all submissions for a specific week and year (excludes cancelled).
+   * Automatically pages through results to avoid truncation.
+   */
+  public async getAllByWeek(year: number, weekNumber: number): Promise<ITimesheetSubmission[]> {
+    const query = this.sp.web.lists
+      .getByTitle(LIST_NAMES.SUBMISSIONS)
+      .items.filter(`Year eq ${year} and WeekNumber eq ${weekNumber} and Status ne 'Cancelled' and Status ne 'Rejected'`)
+      .select(...SUBMISSION_FIELDS.SELECT)
+      .expand(...SUBMISSION_FIELDS.EXPAND)
+      .orderBy("EmployeeId", true)
+      .top(MAX_ITEMS_PER_QUERY);
+    return SubmissionService.mapSubmissions(await fetchAllItems(query));
   }
 
   /**
    * Get all approved submissions across all employees.
+   * Automatically pages through results to avoid truncation.
    */
   public async getAllApproved(): Promise<ITimesheetSubmission[]> {
-    const items = await this.sp.web.lists
+    const query = this.sp.web.lists
       .getByTitle(LIST_NAMES.SUBMISSIONS)
       .items.filter(`Status eq 'Approved'`)
       .select(...SUBMISSION_FIELDS.SELECT)
       .expand(...SUBMISSION_FIELDS.EXPAND)
       .orderBy("ApprovedDate", false)
-      .top(MAX_ITEMS_PER_QUERY)();
-    return SubmissionService.mapSubmissions(items);
+      .top(MAX_ITEMS_PER_QUERY);
+    return SubmissionService.mapSubmissions(await fetchAllItems(query));
   }
 
   /**

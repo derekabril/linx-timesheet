@@ -1,6 +1,7 @@
 import { SPFI } from "@pnp/sp";
 import { ITimeEntry, ITimeEntryCreate } from "../models/ITimeEntry";
 import { LIST_NAMES, TIME_ENTRY_FIELDS, MAX_ITEMS_PER_QUERY } from "../utils/constants";
+import { fetchAllItems } from "../utils/spPaging";
 
 export class TimeEntryService {
   private sp: SPFI;
@@ -93,17 +94,18 @@ export class TimeEntryService {
   }
 
   /**
-   * Get entries for multiple submission IDs in a single query.
+   * Get entries for multiple submission IDs, automatically paging through results.
    */
   public async getBySubmissionIds(submissionIds: number[]): Promise<ITimeEntry[]> {
     if (submissionIds.length === 0) return [];
     const filter = submissionIds.map((id) => `SubmissionId eq ${id}`).join(" or ");
-    const items = await this.sp.web.lists
+    const query = this.sp.web.lists
       .getByTitle(LIST_NAMES.TIME_ENTRIES)
       .items.filter(filter)
       .select(...TIME_ENTRY_FIELDS.SELECT)
       .expand(...TIME_ENTRY_FIELDS.EXPAND)
-      .top(MAX_ITEMS_PER_QUERY)();
+      .top(MAX_ITEMS_PER_QUERY);
+    const items = await fetchAllItems(query);
     return TimeEntryService.mapEntries(items);
   }
 
@@ -129,12 +131,13 @@ export class TimeEntryService {
 
   /**
    * Get entries for all employees in a date range (manager reporting).
+   * Automatically pages through results to avoid the 500-item truncation.
    */
   public async getAllByDateRange(
     startDate: string,
     endDate: string
   ): Promise<ITimeEntry[]> {
-    const items = await this.sp.web.lists
+    const query = this.sp.web.lists
       .getByTitle(LIST_NAMES.TIME_ENTRIES)
       .items.filter(
         `EntryDate ge '${startDate}' and EntryDate le '${endDate}' and Status ne 'Voided'`
@@ -142,7 +145,8 @@ export class TimeEntryService {
       .select(...TIME_ENTRY_FIELDS.SELECT)
       .expand(...TIME_ENTRY_FIELDS.EXPAND)
       .orderBy("EntryDate", true)
-      .top(MAX_ITEMS_PER_QUERY)();
+      .top(MAX_ITEMS_PER_QUERY);
+    const items = await fetchAllItems(query);
     return TimeEntryService.mapEntries(items);
   }
 

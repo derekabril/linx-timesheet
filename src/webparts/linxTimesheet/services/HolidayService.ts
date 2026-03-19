@@ -13,7 +13,7 @@ export class HolidayService {
     return this.sp.web.lists
       .getByTitle(LIST_NAMES.HOLIDAYS)
       .items.filter(`Year eq ${year} or IsRecurring eq 1`)
-      .select("Id", "Title", "HolidayDate", "Year", "IsRecurring")
+      .select("Id", "Title", "HolidayDate", "Year", "IsRecurring", "Category")
       .orderBy("HolidayDate", true)
       .top(100)();
   }

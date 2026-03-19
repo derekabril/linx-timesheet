@@ -6,6 +6,7 @@ import { useAppContext } from "../../context/AppContext";
 import { useAppTheme } from "../../hooks/useAppTheme";
 import { formatTime } from "../../utils/dateUtils";
 import { ITimeEntry } from "../../models/ITimeEntry";
+import { getEffectiveHoursByDate } from "../../utils/effectiveHours";
 
 export const AttendanceReport: React.FC = () => {
   const { weekEntries, selectedWeek } = useTimesheetContext();
@@ -24,10 +25,7 @@ export const AttendanceReport: React.FC = () => {
   const expectedDays = configuration.workingDaysPerWeek;
   const absentDays = expectedDays - uniqueDays.size;
 
-  const dailyHours = new Map<string, number>();
-  weekEntries.forEach((e) => {
-    dailyHours.set(e.EntryDate, (dailyHours.get(e.EntryDate) || 0) + e.TotalHours);
-  });
+  const dailyHours = getEffectiveHoursByDate(weekEntries);
   const avgHours =
     dailyHours.size > 0
       ? Array.from(dailyHours.values()).reduce((a, b) => a + b, 0) / dailyHours.size

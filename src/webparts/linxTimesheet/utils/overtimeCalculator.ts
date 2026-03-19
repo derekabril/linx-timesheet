@@ -1,6 +1,6 @@
 import { ITimeEntry } from "../models/ITimeEntry";
 import { IAppConfiguration } from "../models/IConfiguration";
-import { EntryStatus } from "../models/enums";
+import { getEffectiveHoursByDate } from "./effectiveHours";
 
 export interface IOvertimeResult {
   regularHours: number;
@@ -33,13 +33,8 @@ export function calculateOvertime(
   const dailyThreshold = config.overtimeDailyThreshold;
   const weeklyThreshold = config.overtimeWeeklyThreshold;
 
-  // Group hours by date, excluding voided entries
-  const byDate = new Map<string, number>();
-  for (const entry of entries) {
-    if (entry.Status === EntryStatus.Voided) continue;
-    const key = entry.EntryDate;
-    byDate.set(key, (byDate.get(key) || 0) + entry.TotalHours);
-  }
+  // Group hours by date, using effective hours to avoid Clock/Timer double-counting
+  const byDate = getEffectiveHoursByDate(entries);
 
   const dailyBreakdown: IDailyBreakdown[] = [];
   let weeklyRegular = 0;

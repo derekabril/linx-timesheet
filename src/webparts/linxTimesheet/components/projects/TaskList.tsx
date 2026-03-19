@@ -5,7 +5,7 @@ import {
   SelectionMode,
   IColumn,
 } from "@fluentui/react/lib/DetailsList";
-import { PrimaryButton } from "@fluentui/react/lib/Button";
+import { PrimaryButton, IconButton } from "@fluentui/react/lib/Button";
 import { Stack } from "@fluentui/react/lib/Stack";
 import { Text } from "@fluentui/react/lib/Text";
 import { useTasks } from "../../hooks/useTasks";
@@ -13,6 +13,7 @@ import { ITask } from "../../models/ITask";
 import { formatHours } from "../../utils/hoursFormatter";
 import { LoadingSpinner } from "../common/LoadingSpinner";
 import { TaskForm } from "./TaskForm";
+import { ConfirmDialog } from "../common/ConfirmDialog";
 import { useAppTheme } from "../../hooks/useAppTheme";
 
 interface ITaskListProps {
@@ -21,8 +22,26 @@ interface ITaskListProps {
 
 export const TaskList: React.FC<ITaskListProps> = ({ projectId }) => {
   const { colors } = useAppTheme();
-  const { tasks, loading, create } = useTasks(projectId);
+  const { tasks, loading, create, update, archive } = useTasks(projectId);
   const [showForm, setShowForm] = React.useState(false);
+  const [editTask, setEditTask] = React.useState<ITask | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<ITask | null>(null);
+
+  const handleEdit = (task: ITask): void => {
+    setEditTask(task);
+    setShowForm(true);
+  };
+
+  const handleDismissForm = (): void => {
+    setShowForm(false);
+    setEditTask(null);
+  };
+
+  const handleDelete = async (): Promise<void> => {
+    if (!deleteTarget) return;
+    await archive(deleteTarget.Id);
+    setDeleteTarget(null);
+  };
 
   const columns: IColumn[] = [
     { key: "code", name: "Code", fieldName: "TaskCode", minWidth: 80, maxWidth: 100 },
@@ -41,6 +60,30 @@ export const TaskList: React.FC<ITaskListProps> = ({ projectId }) => {
       maxWidth: 80,
       onRender: (item: ITask) => (item.IsActive ? "Yes" : "No"),
     },
+    {
+      key: "actions",
+      name: "",
+      minWidth: 70,
+      maxWidth: 70,
+      onRender: (item: ITask) => (
+        <Stack horizontal tokens={{ childrenGap: 4 }}>
+          <IconButton
+            iconProps={{ iconName: "Edit" }}
+            title="Edit task"
+            onClick={() => handleEdit(item)}
+          />
+          <IconButton
+            iconProps={{ iconName: "Delete" }}
+            title="Delete task"
+            onClick={() => setDeleteTarget(item)}
+            styles={{
+              root: { color: colors.borderError },
+              rootHovered: { color: colors.borderErrorHover },
+            }}
+          />
+        </Stack>
+      ),
+    },
   ];
 
   if (loading) return <LoadingSpinner label="Loading tasks..." />;
@@ -52,7 +95,7 @@ export const TaskList: React.FC<ITaskListProps> = ({ projectId }) => {
         <PrimaryButton
           text="Add Task"
           iconProps={{ iconName: "Add" }}
-          onClick={() => setShowForm(true)}
+          onClick={() => { setEditTask(null); setShowForm(true); }}
         />
       </Stack>
 
@@ -74,13 +117,27 @@ export const TaskList: React.FC<ITaskListProps> = ({ projectId }) => {
         <TaskForm
           isOpen={showForm}
           projectId={projectId}
+          editTask={editTask || undefined}
           onSave={async (data) => {
-            await create(data);
-            setShowForm(false);
+            if (editTask) {
+              await update(editTask.Id, data);
+            } else {
+              await create(data);
+            }
+            handleDismissForm();
           }}
-          onDismiss={() => setShowForm(false)}
+          onDismiss={handleDismissForm}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={deleteTarget !== null}
+        title="Delete Task"
+        message={deleteTarget ? `Are you sure you want to delete "${deleteTarget.Title}"?` : ""}
+        confirmText="Delete"
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </Stack>
   );
 };

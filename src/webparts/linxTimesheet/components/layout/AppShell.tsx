@@ -12,6 +12,7 @@ import { LeavePanel } from "../leave/LeavePanel";
 import { ApprovalDashboard } from "../approval/ApprovalDashboard";
 import { ReportingDashboard } from "../reporting/ReportingDashboard";
 import { AdminPanel } from "../admin/AdminPanel";
+import { WeeklyPayrollReport } from "../reporting/WeeklyPayrollReport";
 import { AppTab } from "../../models/enums";
 import { useAppTheme } from "../../hooks/useAppTheme";
 
@@ -30,7 +31,7 @@ const headerClass = mergeStyles({
 });
 
 export const AppShell: React.FC<IAppShellProps> = ({ title }) => {
-  const { isLoading, error, isManager, isAdmin, isSiteOwner, currentUser } = useAppContext();
+  const { isLoading, error, isAdmin, isBookkeeper, currentUser } = useAppContext();
   const { colors } = useAppTheme();
   const [activeTab, setActiveTab] = React.useState<string>(AppTab.Timesheet);
 
@@ -82,19 +83,23 @@ export const AppShell: React.FC<IAppShellProps> = ({ title }) => {
           <LeavePanel />
         </PivotItem>
 
-        {(isManager || isAdmin || isSiteOwner) && (
-          <PivotItem headerText="Approvals" itemKey={AppTab.Approvals} itemIcon="CheckMark">
-            <ApprovalDashboard />
-          </PivotItem>
-        )}
+        <PivotItem headerText="Approvals" itemKey={AppTab.Approvals} itemIcon="CheckMark">
+          <ApprovalDashboard />
+        </PivotItem>
 
         <PivotItem headerText="Reports" itemKey={AppTab.Reports} itemIcon="BarChart4">
           <ReportingDashboard />
         </PivotItem>
 
-        {isAdmin && (
+        {(isAdmin || isBookkeeper) && (
+          <PivotItem headerText="Payroll" itemKey={AppTab.Payroll} itemIcon="Money">
+            <WeeklyPayrollReport />
+          </PivotItem>
+        )}
+
+        {(isAdmin || isBookkeeper) && (
           <PivotItem headerText="Admin" itemKey={AppTab.Admin} itemIcon="Settings">
-            <AdminPanel />
+            <AdminPanel readOnly={isBookkeeper && !isAdmin} />
           </PivotItem>
         )}
       </Pivot>
