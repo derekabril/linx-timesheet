@@ -8,7 +8,7 @@ import { useTimesheetContext } from "../../context/TimesheetContext";
 import { useAppContext } from "../../context/AppContext";
 import { useTimeEntries } from "../../hooks/useTimeEntries";
 import { useAppTheme } from "../../hooks/useAppTheme";
-import { formatTime } from "../../utils/dateUtils";
+import { formatTime, toChicagoISOString } from "../../utils/dateUtils";
 import { formatTimerDisplay } from "../../utils/hoursFormatter";
 import { ErrorMessage } from "../common/ErrorMessage";
 
@@ -32,10 +32,10 @@ export const ClockInOut: React.FC = () => {
   // Live elapsed counter when clocked in
   React.useEffect(() => {
     if (isClockedIn && activeClockEntry?.ClockIn) {
-      const clockInDate = new Date(activeClockEntry.ClockIn);
+      const clockInDate = new Date(activeClockEntry.ClockIn); // stored as Chicago fake-UTC
       const updateElapsed = (): void => {
-        const now = new Date();
-        setElapsedSeconds(Math.floor((now.getTime() - clockInDate.getTime()) / 1000));
+        const chicagoNow = new Date(toChicagoISOString(new Date()));
+        setElapsedSeconds(Math.floor((chicagoNow.getTime() - clockInDate.getTime()) / 1000));
       };
       updateElapsed();
       intervalRef.current = window.setInterval(updateElapsed, 1000);

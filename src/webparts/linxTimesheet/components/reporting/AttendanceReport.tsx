@@ -18,7 +18,7 @@ export const AttendanceReport: React.FC = () => {
   const lateArrivals = clockEntries.filter((e) => {
     if (!e.ClockIn) return false;
     const clockInTime = new Date(e.ClockIn);
-    return clockInTime.getHours() >= 9 && clockInTime.getMinutes() > 15;
+    return clockInTime.getUTCHours() >= 9 && clockInTime.getUTCMinutes() > 15;
   });
 
   const uniqueDays = new Set(weekEntries.map((e) => e.EntryDate));

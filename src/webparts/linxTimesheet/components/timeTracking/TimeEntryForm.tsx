@@ -7,6 +7,7 @@ import { Dropdown, IDropdownOption } from "@fluentui/react/lib/Dropdown";
 import { SpinButton } from "@fluentui/react/lib/SpinButton";
 import { Stack } from "@fluentui/react/lib/Stack";
 import { ITimeEntry } from "../../models/ITimeEntry";
+import { extractTime } from "../../utils/dateUtils";
 
 interface ITimeEntryFormProps {
   isOpen: boolean;
@@ -35,12 +36,18 @@ export const TimeEntryForm: React.FC<ITimeEntryFormProps> = ({
   projectOptions,
   taskOptions,
 }) => {
+  const defaultProjectId = React.useMemo(() => {
+    if (entry?.ProjectId) return entry.ProjectId;
+    const firstProject = projectOptions.find(o => o.key !== "");
+    return firstProject ? (firstProject.key as number) : null;
+  }, [entry, projectOptions]);
+
   const [state, setState] = React.useState<ITimeEntryFormState>({
     entryDate: entry ? new Date(entry.EntryDate) : new Date(),
-    startTime: entry?.ClockIn ? new Date(entry.ClockIn).toTimeString().slice(0, 5) : "09:00",
-    endTime: entry?.ClockOut ? new Date(entry.ClockOut).toTimeString().slice(0, 5) : "17:00",
+    startTime: entry?.ClockIn ? extractTime(entry.ClockIn) : "09:00",
+    endTime: entry?.ClockOut ? extractTime(entry.ClockOut) : "17:00",
     breakMinutes: entry?.BreakMinutes || 0,
-    projectId: entry?.ProjectId || null,
+    projectId: defaultProjectId,
     taskId: entry?.TaskId || null,
     notes: entry?.Notes || "",
   });

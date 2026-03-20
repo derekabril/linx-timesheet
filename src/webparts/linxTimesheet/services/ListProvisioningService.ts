@@ -69,6 +69,7 @@ export class ListProvisioningService {
       this.ensureList(LIST_NAMES.USER_RATES, this.userRatesFields()),
       this.ensureList(LIST_NAMES.INCENTIVES, this.incentivesFields()),
       this.ensureList(LIST_NAMES.INCENTIVE_ASSIGNMENTS, this.incentiveAssignmentsFields()),
+      this.ensureList(LIST_NAMES.PAYROLL_INCENTIVE_SELECTIONS, this.payrollIncentiveSelectionsFields()),
     ]);
 
     // Create lookup fields after all lists exist
@@ -99,6 +100,8 @@ export class ListProvisioningService {
       // Incentive lists
       this.ensureList(LIST_NAMES.INCENTIVES, this.incentivesFields()),
       this.ensureList(LIST_NAMES.INCENTIVE_ASSIGNMENTS, this.incentiveAssignmentsFields()),
+      // Payroll incentive selections
+      this.ensureList(LIST_NAMES.PAYROLL_INCENTIVE_SELECTIONS, this.payrollIncentiveSelectionsFields()),
     ]);
 
     // Fields that depend on lists existing above
@@ -425,6 +428,15 @@ export class ListProvisioningService {
     return [
       { name: "Employee", type: "User", indexed: true },
       // Incentive lookup is added in ensureLookupFields
+    ];
+  }
+
+  private payrollIncentiveSelectionsFields(): IFieldDef[] {
+    return [
+      { name: "Employee", type: "User", indexed: true },
+      { name: "Year", type: "Number", indexed: true },
+      { name: "WeekNumber", type: "Number", indexed: true },
+      { name: "SelectedIncentiveIds", type: "Text" },
     ];
   }
 

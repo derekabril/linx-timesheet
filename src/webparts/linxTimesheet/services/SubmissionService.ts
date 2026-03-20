@@ -121,7 +121,12 @@ export class SubmissionService {
     const result = await this.sp.web.lists
       .getByTitle(LIST_NAMES.SUBMISSIONS)
       .items.add(submission);
-    return result as unknown as ITimesheetSubmission;
+    // PnPjs v4 items.add() may return { data: { Id, ... } } or { Id, ... }
+    const item = (result as { data?: Record<string, unknown> }).data ?? result;
+    if (!item || !item.Id) {
+      throw new Error("Failed to create submission: no Id returned from SharePoint.");
+    }
+    return item as unknown as ITimesheetSubmission;
   }
 
   /**

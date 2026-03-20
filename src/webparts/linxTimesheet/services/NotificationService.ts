@@ -62,7 +62,11 @@ export class NotificationService {
   private formatTime(dateTimeStr: string | null): string {
     if (!dateTimeStr) return "--";
     const date = new Date(dateTimeStr);
-    return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    const hours = date.getUTCHours();
+    const minutes = date.getUTCMinutes();
+    const ampm = hours >= 12 ? "PM" : "AM";
+    const h = hours % 12 || 12;
+    return `${h}:${String(minutes).padStart(2, "0")} ${ampm}`;
   }
 
   private buildEntryRows(entries: IEntryDetail[]): string {

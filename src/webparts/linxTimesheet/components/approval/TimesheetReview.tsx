@@ -9,6 +9,7 @@ import { Stack } from "@fluentui/react/lib/Stack";
 import { Text } from "@fluentui/react/lib/Text";
 import { IconButton, DefaultButton } from "@fluentui/react/lib/Button";
 import { TextField } from "@fluentui/react/lib/TextField";
+import { Dialog, DialogType, DialogFooter } from "@fluentui/react/lib/Dialog";
 import { MessageBar, MessageBarType } from "@fluentui/react/lib/MessageBar";
 import { useSubmissions } from "../../hooks/useSubmissions";
 import { ITimesheetSubmission } from "../../models/ITimesheetSubmission";
@@ -35,16 +36,25 @@ export const TimesheetReview: React.FC<ITimesheetReviewProps> = ({ submission, o
   const [revokeComments, setRevokeComments] = React.useState("");
   const [revokeError, setRevokeError] = React.useState<string | null>(null);
   const { revokeApproval, loading: revokeLoading } = useSubmissions();
+  const [notesDialog, setNotesDialog] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const load = async (): Promise<void> => {
       const service = new TimeEntryService(getSP());
-      const data = await service.getBySubmission(submission.Id);
+      let data = await service.getBySubmission(submission.Id);
+      // Fallback: if no entries linked by SubmissionId, query by employee + week
+      if (data.length === 0 && submission.EmployeeId && submission.WeekNumber && submission.Year) {
+        data = await service.getByEmployeeAndWeek(
+          submission.EmployeeId,
+          submission.Year,
+          submission.WeekNumber
+        );
+      }
       setEntries(data);
       setLoading(false);
     };
     load();
-  }, [submission.Id]);
+  }, [submission.Id, submission.EmployeeId, submission.WeekNumber, submission.Year]);
 
   const columns: IColumn[] = [
     {
@@ -95,10 +105,29 @@ export const TimesheetReview: React.FC<ITimesheetReviewProps> = ({ submission, o
     {
       key: "notes",
       name: "Notes",
-      fieldName: "Notes",
       minWidth: 150,
       maxWidth: 250,
-      onRender: (item: ITimeEntry) => item.Notes || "--",
+      onRender: (item: ITimeEntry) => {
+        if (!item.Notes) return "--";
+        return (
+          <Text
+            styles={{
+              root: {
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                cursor: "pointer",
+                color: colors.textLink,
+                ":hover": { textDecoration: "underline" },
+              },
+            }}
+            onClick={() => setNotesDialog(item.Notes || null)}
+            title="Click to view full notes"
+          >
+            {item.Notes}
+          </Text>
+        );
+      },
     },
   ];
 
@@ -151,6 +180,21 @@ export const TimesheetReview: React.FC<ITimesheetReviewProps> = ({ submission, o
       {!readOnly && submission.Status === "Submitted" && (
         <ApprovalActions submissionId={submission.Id} submission={submission} onComplete={onBack} />
       )}
+
+      <Dialog
+        hidden={notesDialog === null}
+        onDismiss={() => setNotesDialog(null)}
+        dialogContentProps={{
+          type: DialogType.normal,
+          title: "Entry Notes",
+        }}
+        minWidth={420}
+      >
+        <Text styles={{ root: { whiteSpace: "pre-wrap" } }}>{notesDialog}</Text>
+        <DialogFooter>
+          <DefaultButton text="Close" onClick={() => setNotesDialog(null)} />
+        </DialogFooter>
+      </Dialog>
 
       {!readOnly && submission.Status === "Approved" && (
         <Stack tokens={{ childrenGap: 12 }} styles={{ root: { padding: "16px 0" } }}>

@@ -9,6 +9,8 @@ import { Stack } from "@fluentui/react/lib/Stack";
 import { Text } from "@fluentui/react/lib/Text";
 import { IconButton, PrimaryButton, DefaultButton } from "@fluentui/react/lib/Button";
 import { TextField } from "@fluentui/react/lib/TextField";
+import { Checkbox } from "@fluentui/react/lib/Checkbox";
+import { Dialog, DialogType, DialogFooter } from "@fluentui/react/lib/Dialog";
 import { MessageBar, MessageBarType } from "@fluentui/react/lib/MessageBar";
 import { CommandBar, ICommandBarItemProps } from "@fluentui/react/lib/CommandBar";
 import { useAppContext } from "../../context/AppContext";
@@ -27,6 +29,7 @@ import {
 } from "../../utils/dateUtils";
 import { formatHours } from "../../utils/hoursFormatter";
 import { NotificationService, IPayrollEmailRow, IPayrollTotals } from "../../services/NotificationService";
+import { PayrollIncentiveService } from "../../services/PayrollIncentiveService";
 import { LoadingSpinner } from "../common/LoadingSpinner";
 import { useAppTheme } from "../../hooks/useAppTheme";
 import {
@@ -37,12 +40,13 @@ import {
 } from "../../utils/exportUtils";
 
 interface IPayrollRow {
+  employeeId: number;
   contractorName: string;
   totalWorkHours: number | null;
   holidayPaidHours: number | null;
   rate: number;
   holidayPay: number | null;
-  incentiveAmount: number | null;
+  incentiveAmount: number;
   weeklyTotal: number | null;
   status: string;
 }
@@ -58,6 +62,10 @@ const exportColumns: IExportColumn[] = [
   { key: "status", header: "Status", width: 15 },
 ];
 
+// In-memory cache for fast tab-switch persistence (survives component unmount/remount)
+// Authoritative data lives in SharePoint and is loaded on mount / week change
+const incentiveMemCache: Record<string, Record<number, Record<number, number>>> = {};
+
 export const WeeklyPayrollReport: React.FC = () => {
   const { configuration, holidays, isAdmin, isBookkeeper, currentUser } = useAppContext();
   const { rates, loading: ratesLoading, refresh: refreshRates } = useUserRates();
@@ -65,6 +73,17 @@ export const WeeklyPayrollReport: React.FC = () => {
   const { colors, theme } = useAppTheme();
 
   const [selectedDate, setSelectedDate] = React.useState(new Date());
+
+  const weekStart = getWeekStart(selectedDate);
+  const weekEnd = getWeekEnd(selectedDate);
+  const weekNumber = getISOWeekNumber(selectedDate);
+  const year = weekStart.getFullYear();
+
+  const sp = getSP();
+  const submissionService = React.useMemo(() => new SubmissionService(sp), [sp]);
+  const payrollIncentiveService = React.useMemo(() => new PayrollIncentiveService(sp), [sp]);
+  const notificationService = React.useMemo(() => new NotificationService(), []);
+
   const [submissions, setSubmissions] = React.useState<ITimesheetSubmission[]>([]);
   const [submissionsLoading, setSubmissionsLoading] = React.useState(true);
   const [exporting, setExporting] = React.useState(false);
@@ -72,16 +91,21 @@ export const WeeklyPayrollReport: React.FC = () => {
   const [sending, setSending] = React.useState(false);
   const [actionMessage, setActionMessage] = React.useState<{ type: MessageBarType; text: string } | null>(null);
   const [approvalOverride, setApprovalOverride] = React.useState(false);
-
-  const notificationService = React.useMemo(() => new NotificationService(), []);
-
-  const sp = getSP();
-  const submissionService = React.useMemo(() => new SubmissionService(sp), [sp]);
-
-  const weekStart = getWeekStart(selectedDate);
-  const weekEnd = getWeekEnd(selectedDate);
-  const weekNumber = getISOWeekNumber(selectedDate);
-  const year = weekStart.getFullYear();
+  // Manual incentive selections: employeeId -> set of selected incentive Ids
+  // In-memory cache for fast tab switches; SharePoint for cross-device persistence
+  const weekKey = `${year}-${weekNumber}`;
+  const [manualIncentives, setManualIncentivesRaw] = React.useState<Record<number, Record<number, number>>>(
+    () => incentiveMemCache[weekKey] || {}
+  );
+  const setManualIncentives = React.useCallback((update: Record<number, Record<number, number>> | ((prev: Record<number, Record<number, number>>) => Record<number, Record<number, number>>)) => {
+    setManualIncentivesRaw((prev) => {
+      const next = typeof update === "function" ? update(prev) : update;
+      incentiveMemCache[weekKey] = next;
+      return next;
+    });
+  }, [weekKey]);
+  const [incentiveDialogTarget, setIncentiveDialogTarget] = React.useState<number | null>(null);
+  const [dialogSelections, setDialogSelections] = React.useState<Record<number, number>>({});
 
   // Navigate weeks
   const goToPreviousWeek = (): void => {
@@ -137,12 +161,17 @@ export const WeeklyPayrollReport: React.FC = () => {
     fetchSubmissions();
   }, [fetchSubmissions]);
 
-  // Calculate weekly incentive amount for a given employee
-  const getWeeklyIncentive = React.useCallback((employeeId: number): number => {
-    const userAssignments = assignments.filter((a) => a.EmployeeId === employeeId);
-    return userAssignments.reduce((sum, a) => {
-      const incentive = incentives.find((i) => i.Id === a.IncentiveId);
-      if (!incentive || !incentive.IsActive) return sum;
+  // Calculate incentive amount from manually selected incentives
+  const getManualIncentiveTotal = React.useCallback((employeeId: number): number => {
+    const selected = manualIncentives[employeeId];
+    if (!selected || Object.keys(selected).length === 0) return 0;
+    return Object.entries(selected).reduce((sum, [idStr, qty]) => {
+      const incentive = incentives.find((i) => i.Id === Number(idStr));
+      if (!incentive || !incentive.IsActive || qty <= 0) return sum;
+      // Quantity-based incentives (title contains "(#)"): qty × rate
+      if (/\(#\)/.test(incentive.Title)) {
+        return sum + qty * incentive.Value;
+      }
       switch (incentive.Frequency) {
         case IncentiveFrequency.Daily: return sum + incentive.Value * 5;
         case IncentiveFrequency.Weekly: return sum + incentive.Value;
@@ -150,7 +179,26 @@ export const WeeklyPayrollReport: React.FC = () => {
         default: return sum + incentive.Value;
       }
     }, 0);
-  }, [assignments, incentives]);
+  }, [manualIncentives, incentives]);
+
+  // Load incentive selections from SharePoint when week changes (or on mount)
+  const loadIncentiveSelections = React.useCallback(async (): Promise<void> => {
+    try {
+      const data = await payrollIncentiveService.getByWeek(year, weekNumber);
+      incentiveMemCache[weekKey] = data;
+      setManualIncentivesRaw(data);
+    } catch (err) {
+      console.error("Failed to load incentive selections:", err);
+      // Fall back to in-memory cache
+      setManualIncentivesRaw(incentiveMemCache[weekKey] || {});
+    }
+  }, [payrollIncentiveService, year, weekNumber, weekKey]);
+
+  React.useEffect(() => {
+    // Use mem cache immediately for fast render, then load from SharePoint
+    setManualIncentivesRaw(incentiveMemCache[weekKey] || {});
+    loadIncentiveSelections();
+  }, [weekKey, loadIncentiveSelections]);
 
   // Build payroll rows: one row per contractor from user rates
   const payrollRows: IPayrollRow[] = React.useMemo(() => {
@@ -162,6 +210,7 @@ export const WeeklyPayrollReport: React.FC = () => {
         userSubmissions.find((s) => s.Status === SubmissionStatus.Submitted) ||
         userSubmissions[0] || null;
       const isApproved = submission?.Status === SubmissionStatus.Approved;
+      const incentiveAmount = getManualIncentiveTotal(rate.EmployeeId);
 
       if (isApproved) {
         const totalWorkHours = submission.TotalHours;
@@ -169,10 +218,10 @@ export const WeeklyPayrollReport: React.FC = () => {
         const regularHolidayPay = holidayCounts.regular * rate.MaxHoursPerDay * rate.HourlyRate * configuration.regularHolidayRate;
         const specialHolidayPay = holidayCounts.special * rate.MaxHoursPerDay * rate.HourlyRate * configuration.specialHolidayRate;
         const holidayPay = regularHolidayPay + specialHolidayPay;
-        const incentiveAmount = getWeeklyIncentive(rate.EmployeeId);
         const weeklyTotal = (totalWorkHours * rate.HourlyRate) + holidayPay + incentiveAmount;
 
         return {
+          employeeId: rate.EmployeeId,
           contractorName: rate.EmployeeTitle || rate.Title,
           totalWorkHours,
           holidayPaidHours,
@@ -185,17 +234,18 @@ export const WeeklyPayrollReport: React.FC = () => {
       }
 
       return {
+        employeeId: rate.EmployeeId,
         contractorName: rate.EmployeeTitle || rate.Title,
         totalWorkHours: null,
         holidayPaidHours: null,
         rate: rate.HourlyRate,
         holidayPay: null,
-        incentiveAmount: null,
+        incentiveAmount,
         weeklyTotal: null,
         status: submission?.Status || "No Submission",
       };
     });
-  }, [rates, submissions, holidayCounts, configuration.regularHolidayRate, configuration.specialHolidayRate, getWeeklyIncentive]);
+  }, [rates, submissions, holidayCounts, configuration.regularHolidayRate, configuration.specialHolidayRate, getManualIncentiveTotal]);
 
   // Totals for approved rows
   const totals = React.useMemo(() => {
@@ -260,12 +310,27 @@ export const WeeklyPayrollReport: React.FC = () => {
     {
       key: "incentiveAmount",
       name: "Incentive",
-      minWidth: 100,
-      maxWidth: 130,
-      onRender: (item: IPayrollRow) =>
-        item.incentiveAmount !== null
-          ? `$${item.incentiveAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-          : "",
+      minWidth: 120,
+      maxWidth: 150,
+      onRender: (item: IPayrollRow) => {
+        const hasAssignments = assignments.some((a) => a.EmployeeId === item.employeeId);
+        return (
+          <Stack horizontal verticalAlign="center" tokens={{ childrenGap: 4 }}>
+            <Text>{`$${item.incentiveAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
+            {hasAssignments && (
+              <IconButton
+                iconProps={{ iconName: "Edit" }}
+                title="Set incentives"
+                styles={{ root: { width: 24, height: 24 }, icon: { fontSize: 12 } }}
+                onClick={() => {
+                  setIncentiveDialogTarget(item.employeeId);
+                  setDialogSelections(manualIncentives[item.employeeId] || {});
+                }}
+              />
+            )}
+          </Stack>
+        );
+      },
     },
     {
       key: "weeklyTotal",
@@ -303,10 +368,7 @@ export const WeeklyPayrollReport: React.FC = () => {
         row.holidayPay !== null
           ? `$${row.holidayPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : "",
-      incentiveAmount:
-        row.incentiveAmount !== null
-          ? `$${row.incentiveAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-          : "",
+      incentiveAmount: `$${row.incentiveAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       weeklyTotal:
         row.weeklyTotal !== null
           ? `$${row.weeklyTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -621,6 +683,94 @@ export const WeeklyPayrollReport: React.FC = () => {
           )}
         </>
       )}
+
+      {/* Incentive selection dialog */}
+      <Dialog
+        hidden={incentiveDialogTarget === null}
+        onDismiss={() => setIncentiveDialogTarget(null)}
+        dialogContentProps={{
+          type: DialogType.normal,
+          title: "Set Weekly Incentives",
+          subText: incentiveDialogTarget
+            ? `Select applicable incentives for ${payrollRows.find((r) => r.employeeId === incentiveDialogTarget)?.contractorName || "this user"}`
+            : "",
+        }}
+        minWidth={420}
+      >
+        {incentiveDialogTarget !== null && (
+          <Stack tokens={{ childrenGap: 8 }}>
+            {assignments
+              .filter((a) => a.EmployeeId === incentiveDialogTarget)
+              .map((a) => {
+                const inc = incentives.find((i) => i.Id === a.IncentiveId);
+                if (!inc || !inc.IsActive) return null;
+                const isQtyBased = /\(#\)/.test(inc.Title);
+                let weeklyValue = inc.Value;
+                if (!isQtyBased) {
+                  if (inc.Frequency === IncentiveFrequency.Daily) weeklyValue = inc.Value * 5;
+                  else if (inc.Frequency === IncentiveFrequency.Monthly) weeklyValue = inc.Value / 4;
+                }
+                const isChecked = (dialogSelections[inc.Id] || 0) > 0;
+                return (
+                  <Stack key={a.Id} tokens={{ childrenGap: 4 }}>
+                    <Checkbox
+                      label={isQtyBased
+                        ? `${inc.Title} — $${inc.Value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} each`
+                        : `${inc.Title} — $${weeklyValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / week (${inc.Frequency})`
+                      }
+                      checked={isChecked}
+                      onChange={(_, checked) => {
+                        setDialogSelections((prev) => {
+                          const next = { ...prev };
+                          if (checked) {
+                            next[inc.Id] = 1;
+                          } else {
+                            delete next[inc.Id];
+                          }
+                          return next;
+                        });
+                      }}
+                    />
+                    {isQtyBased && isChecked && (
+                      <TextField
+                        type="number"
+                        label="Quantity"
+                        min={1}
+                        value={String(dialogSelections[inc.Id] || 1)}
+                        onChange={(_, v) => {
+                          const qty = Math.max(1, parseInt(v || "1", 10) || 1);
+                          setDialogSelections((prev) => ({ ...prev, [inc.Id]: qty }));
+                        }}
+                        styles={{ root: { width: 100, marginLeft: 28 } }}
+                      />
+                    )}
+                  </Stack>
+                );
+              })}
+          </Stack>
+        )}
+        <DialogFooter>
+          <PrimaryButton
+            text="Apply"
+            onClick={() => {
+              if (incentiveDialogTarget !== null) {
+                const empId = incentiveDialogTarget;
+                const selections = dialogSelections;
+                setManualIncentives((prev) => ({
+                  ...prev,
+                  [empId]: selections,
+                }));
+                setIncentiveDialogTarget(null);
+                // Persist to SharePoint in the background
+                payrollIncentiveService.save(empId, year, weekNumber, selections).catch((err) =>
+                  console.error("Failed to save incentive selections:", err)
+                );
+              }
+            }}
+          />
+          <DefaultButton text="Cancel" onClick={() => setIncentiveDialogTarget(null)} />
+        </DialogFooter>
+      </Dialog>
     </Stack>
   );
 };

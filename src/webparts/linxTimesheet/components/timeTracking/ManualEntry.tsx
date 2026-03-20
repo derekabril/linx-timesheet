@@ -36,6 +36,12 @@ export const ManualEntry: React.FC = React.memo(() => {
   const [validationErrors, setValidationErrors] = React.useState<string[]>([]);
   const [success, setSuccess] = React.useState(false);
 
+  // Default to first project when projects load
+  React.useEffect(() => {
+    if (projects.length > 0 && projectId === null) {
+      setProjectId(projects[0].Id);
+    }
+  }, [projects]);
 
   const projectOptions: IDropdownOption[] = [
     { key: "", text: "(No project)" },

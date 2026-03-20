@@ -54,16 +54,88 @@ export function formatDisplayDate(dateStr: string): string {
 }
 
 /**
+ * Convert a Date to an ISO-like string using its **local** time components.
+ * The result carries a "Z" suffix so SharePoint stores the value as-is,
+ * preserving the submitted time regardless of the viewer's timezone.
+ */
+export function toLocalISOString(date: Date): string {
+  const y = date.getFullYear();
+  const mo = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  const ss = String(date.getSeconds()).padStart(2, "0");
+  return `${y}-${mo}-${d}T${hh}:${mm}:${ss}.000Z`;
+}
+
+/**
+ * Extract "HH:MM" from a stored datetime string using UTC components
+ * (since we store local time as fake-UTC).
+ */
+export function extractTime(dateTimeStr: string): string {
+  const d = new Date(dateTimeStr);
+  return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+/**
+ * Convert a stored fake-UTC datetime back to a real local Date object.
+ * Use this when you need the actual epoch (e.g., for elapsed-time calculations).
+ */
+export function toRealDate(dateTimeStr: string): Date {
+  const d = new Date(dateTimeStr);
+  return new Date(
+    d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(),
+    d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds(),
+  );
+}
+
+/**
+ * Create a Date whose local components reflect America/Chicago (CST/CDT) time.
+ * Used for clock-in/out and timer entries so all real-time timestamps are
+ * normalised to the client's Omaha timezone.
+ */
+export function toChicagoDate(date: Date): Date {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(date);
+  const get = (type: string): number =>
+    parseInt(parts.find(p => p.type === type)?.value || "0", 10);
+  // hour12:false may yield hour=24 for midnight; normalise to 0
+  const hour = get("hour") % 24;
+  return new Date(
+    get("year"), get("month") - 1, get("day"),
+    hour, get("minute"), get("second"),
+  );
+}
+
+/**
+ * Format a Date as a timezone-neutral ISO string in America/Chicago time.
+ * Convenience wrapper around toLocalISOString(toChicagoDate(date)).
+ */
+export function toChicagoISOString(date: Date): string {
+  return toLocalISOString(toChicagoDate(date));
+}
+
+/**
  * Format a datetime string to time only, e.g., "8:30 AM".
+ * Uses UTC components since times are stored as local-time-in-UTC.
  */
 export function formatTime(dateTimeStr: string | null): string {
   if (!dateTimeStr) return "--";
   const date = new Date(dateTimeStr);
-  return date.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
+  const hours = date.getUTCHours();
+  const minutes = date.getUTCMinutes();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  const h = hours % 12 || 12;
+  return `${h}:${String(minutes).padStart(2, "0")} ${ampm}`;
 }
 
 /**
@@ -128,8 +200,10 @@ export function buildTimeString(hours: number, minutes: number): string {
 }
 
 /**
- * Combine a date string (YYYY-MM-DD) with a time string (HH:MM) into an ISO datetime.
+ * Combine a date string (YYYY-MM-DD) with a time string (HH:MM) into a
+ * timezone-neutral ISO datetime.  No Date object is created, so no
+ * timezone conversion occurs — the literal time is preserved.
  */
 export function combineDateAndTime(dateStr: string, timeStr: string): string {
-  return new Date(`${dateStr}T${timeStr}:00`).toISOString();
+  return `${dateStr}T${timeStr}:00.000Z`;
 }

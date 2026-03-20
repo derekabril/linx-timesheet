@@ -27,3 +27,16 @@ jest-output/
 # Logs
 *.log
 npm-debug.log*
+
+# Documentation & sample files
+*.docx
+*.pdf
+*.xlsx
+USER_MANUAL.md
+generate-manual-docx.js
+
+# Images
+color.png
+
+# Teams package
+linx-timesheet-teams.zip

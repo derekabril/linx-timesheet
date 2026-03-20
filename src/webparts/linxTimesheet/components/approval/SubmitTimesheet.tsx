@@ -7,6 +7,7 @@ import { useTimesheetContext } from "../../context/TimesheetContext";
 import { useAppContext } from "../../context/AppContext";
 import { useSubmissions } from "../../hooks/useSubmissions";
 import { TimeEntryService } from "../../services/TimeEntryService";
+import { SubmissionService } from "../../services/SubmissionService";
 import { getSP } from "../../services/PnPConfig";
 import { calculateOvertime } from "../../utils/overtimeCalculator";
 import { formatHours } from "../../utils/hoursFormatter";
@@ -27,9 +28,11 @@ export const SubmitTimesheet: React.FC = () => {
   const [error, setError] = React.useState<string | null>(null);
   const [refreshing, setRefreshing] = React.useState(false);
   const [cancelling, setCancelling] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
 
   const sp = getSP();
   const timeEntryService = React.useMemo(() => new TimeEntryService(sp), [sp]);
+  const submissionService = React.useMemo(() => new SubmissionService(sp), [sp]);
 
   const handleRefresh = async (): Promise<void> => {
     setRefreshing(true);
@@ -55,10 +58,24 @@ export const SubmitTimesheet: React.FC = () => {
     completedEntries.length > 0;
 
   const handleCancel = async (): Promise<void> => {
-    if (!currentSubmission) return;
+    if (!currentSubmission || !currentUser) return;
     setCancelling(true);
     setError(null);
     try {
+      // Re-fetch the latest status from SharePoint to prevent cancelling an already-approved submission
+      const latest = await submissionService.getByEmployeeAndWeek(
+        currentUser.id,
+        selectedWeek.year,
+        selectedWeek.weekNumber
+      );
+      if (latest && latest.Status !== SubmissionStatus.Submitted) {
+        setShowCancelConfirm(false);
+        setError(`This timesheet has already been ${latest.Status.toLowerCase()}. The status has been refreshed.`);
+        await refreshSubmission();
+        await refreshWeekEntries();
+        return;
+      }
+
       const entries = await timeEntryService.getBySubmission(currentSubmission.Id);
       const entryIds = entries.map((e) => e.Id);
       await cancelSubmission(currentSubmission.Id, entryIds);
@@ -74,7 +91,8 @@ export const SubmitTimesheet: React.FC = () => {
   };
 
   const handleSubmit = async (): Promise<void> => {
-    if (!currentUser) return;
+    if (!currentUser || submitting) return;
+    setSubmitting(true);
     setError(null);
     try {
       // Use manager as primary approver; if no manager, set to 0 (site owners will see it)
@@ -93,6 +111,8 @@ export const SubmitTimesheet: React.FC = () => {
       await refreshWeekEntries();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -148,7 +168,7 @@ export const SubmitTimesheet: React.FC = () => {
             text="Submit for Approval"
             iconProps={{ iconName: "Send" }}
             onClick={() => setShowConfirm(true)}
-            disabled={!canSubmit || loading}
+            disabled={!canSubmit || loading || submitting}
             styles={{ root: { width: 200 } }}
           />
           {!currentUser?.managerId && (

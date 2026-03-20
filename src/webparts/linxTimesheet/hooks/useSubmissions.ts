@@ -39,6 +39,12 @@ export const useSubmissions = () => {
       setLoading(true);
       setError(null);
       try {
+        // Prevent duplicate submissions for the same week
+        const existing = await submissionService.getByEmployeeAndWeek(employeeId, year, weekNumber);
+        if (existing) {
+          throw new Error(`A timesheet for Week ${weekNumber}, ${year} has already been submitted.`);
+        }
+
         const overtime = calculateOvertime(entries, config);
         const weekStart = getWeekStart(new Date(entries[0]?.EntryDate || new Date()));
         const weekEnd = getWeekEnd(weekStart);

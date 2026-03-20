@@ -34,6 +34,13 @@ export const Timer: React.FC = () => {
   const [selectedProjectId, setSelectedProjectId] = React.useState<number | null>(null);
   const { tasks } = useTasks(selectedProjectId);
 
+  // Default to first project when projects load
+  React.useEffect(() => {
+    if (projects.length > 0 && selectedProjectId === null) {
+      setSelectedProjectId(projects[0].Id);
+    }
+  }, [projects]);
+
   const [showSaveDialog, setShowSaveDialog] = React.useState(false);
   const [saveProjectId, setSaveProjectId] = React.useState<number | null>(null);
   const [saveTaskId, setSaveTaskId] = React.useState<number | null>(null);

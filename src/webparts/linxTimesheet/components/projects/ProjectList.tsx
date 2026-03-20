@@ -20,6 +20,7 @@ import { LoadingSpinner } from "../common/LoadingSpinner";
 import { ErrorMessage } from "../common/ErrorMessage";
 import { ProjectForm } from "./ProjectForm";
 import { ProjectDetail } from "./ProjectDetail";
+import { ImportProjectsDialog } from "./ImportProjectsDialog";
 import { Dropdown, IDropdownOption } from "@fluentui/react/lib/Dropdown";
 import { useAppTheme } from "../../hooks/useAppTheme";
 import { getDivisionOptions, getAreaOptions } from "../../utils/divisions";
@@ -48,6 +49,7 @@ export const ProjectList: React.FC<IProjectListProps> = ({ pageSize = 10 }) => {
   const [editProject, setEditProject] = React.useState<IProject | undefined>();
   const [selectedProject, setSelectedProject] = React.useState<IProject | null>(null);
   const [archiveTarget, setArchiveTarget] = React.useState<IProject | null>(null);
+  const [showImport, setShowImport] = React.useState(false);
   const [currentPage, setCurrentPage] = React.useState(1);
   const [itemsPerPage, setItemsPerPage] = React.useState(pageSize);
 
@@ -101,6 +103,12 @@ export const ProjectList: React.FC<IProjectListProps> = ({ pageSize = 10 }) => {
             setEditProject(undefined);
             setShowForm(true);
           },
+        },
+        {
+          key: "import",
+          text: "Import Projects",
+          iconProps: { iconName: "ExcelDocument" },
+          onClick: () => setShowImport(true),
         },
         {
           key: "refresh",
@@ -370,6 +378,14 @@ export const ProjectList: React.FC<IProjectListProps> = ({ pageSize = 10 }) => {
           onDismiss={() => setShowForm(false)}
         />
       )}
+
+      <ImportProjectsDialog
+        isOpen={showImport}
+        existingCodes={projects.map(p => p.ProjectCode)}
+        onImport={async (data) => { await create(data as never); }}
+        onDismiss={() => setShowImport(false)}
+        onComplete={() => { setShowImport(false); refresh(); }}
+      />
     </Stack>
   );
 };

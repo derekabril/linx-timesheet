@@ -10,6 +10,7 @@ export const LIST_NAMES = {
   USER_RATES: "LinxUserRates",
   INCENTIVES: "LinxIncentives",
   INCENTIVE_ASSIGNMENTS: "LinxIncentiveAssignments",
+  PAYROLL_INCENTIVE_SELECTIONS: "LinxPayrollIncentiveSelections",
 } as const;
 
 export const TIME_ENTRY_FIELDS = {

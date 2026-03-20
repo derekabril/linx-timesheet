@@ -5,7 +5,7 @@ import { AuditService } from "../services/AuditService";
 import { ITimeEntry, ITimeEntryCreate } from "../models/ITimeEntry";
 import { EntryType, EntryStatus, AuditAction } from "../models/enums";
 import { LIST_NAMES } from "../utils/constants";
-import { getISOWeekNumber, toDateString, calculateHours } from "../utils/dateUtils";
+import { getISOWeekNumber, toDateString, calculateHours, toLocalISOString, combineDateAndTime, toChicagoDate, toChicagoISOString } from "../utils/dateUtils";
 
 export const useTimeEntries = () => {
   const [loading, setLoading] = useState(false);
@@ -20,12 +20,12 @@ export const useTimeEntries = () => {
       setLoading(true);
       setError(null);
       try {
-        const now = new Date();
+        const chicagoNow = toChicagoDate(new Date());
         const entry: ITimeEntryCreate = {
-          Title: `Clock-${toDateString(now)}`,
+          Title: `Clock-${toDateString(chicagoNow)}`,
           EmployeeId: employeeId,
-          EntryDate: toDateString(now),
-          ClockIn: now.toISOString(),
+          EntryDate: toDateString(chicagoNow),
+          ClockIn: toLocalISOString(chicagoNow),
           BreakMinutes: 0,
           TotalHours: 0,
           EntryType: EntryType.Clock,
@@ -35,8 +35,8 @@ export const useTimeEntries = () => {
           Status: EntryStatus.Active,
           IsOvertime: false,
           OvertimeHours: 0,
-          WeekNumber: getISOWeekNumber(now),
-          Year: now.getFullYear(),
+          WeekNumber: getISOWeekNumber(chicagoNow),
+          Year: chicagoNow.getFullYear(),
         };
         const result = await service.create(entry);
         await auditService.logCreate(LIST_NAMES.TIME_ENTRIES, result.Id, entry as unknown as Record<string, unknown>);
@@ -57,14 +57,16 @@ export const useTimeEntries = () => {
       setError(null);
       try {
         const now = new Date();
+        const chicagoNowStr = toChicagoISOString(now);
         // Get current entry to calculate hours
-        const entries = await service.getToday(0, toDateString(now)); // We'll get by ID
+        const chicagoNow = toChicagoDate(now);
+        const entries = await service.getToday(0, toDateString(chicagoNow)); // We'll get by ID
         const current = entries.find((e) => e.Id === entryId);
-        const clockIn = current?.ClockIn || now.toISOString();
-        const totalHours = calculateHours(clockIn, now.toISOString(), breakMinutes);
+        const clockIn = current?.ClockIn || chicagoNowStr;
+        const totalHours = calculateHours(clockIn, chicagoNowStr, breakMinutes);
 
         const updates = {
-          ClockOut: now.toISOString(),
+          ClockOut: chicagoNowStr,
           BreakMinutes: breakMinutes,
           TotalHours: totalHours,
           Status: EntryStatus.Completed,
@@ -103,8 +105,8 @@ export const useTimeEntries = () => {
       setError(null);
       try {
         const dateStr = toDateString(date);
-        const clockIn = new Date(`${dateStr}T${startTime}:00`).toISOString();
-        const clockOut = new Date(`${dateStr}T${endTime}:00`).toISOString();
+        const clockIn = combineDateAndTime(dateStr, startTime);
+        const clockOut = combineDateAndTime(dateStr, endTime);
         const totalHours = calculateHours(clockIn, clockOut, breakMinutes);
 
         const entry: ITimeEntryCreate = {
@@ -153,13 +155,14 @@ export const useTimeEntries = () => {
       try {
         const now = new Date();
         const totalHours = Math.round((totalSeconds / 3600) * 100) / 100;
+        const chicagoStart = toChicagoDate(startTime);
 
         const entry: ITimeEntryCreate = {
-          Title: `Timer-${toDateString(startTime)}`,
+          Title: `Timer-${toDateString(chicagoStart)}`,
           EmployeeId: employeeId,
-          EntryDate: toDateString(startTime),
-          ClockIn: startTime.toISOString(),
-          ClockOut: now.toISOString(),
+          EntryDate: toDateString(chicagoStart),
+          ClockIn: toLocalISOString(chicagoStart),
+          ClockOut: toChicagoISOString(now),
           BreakMinutes: 0,
           TotalHours: totalHours,
           EntryType: EntryType.Timer,
@@ -169,8 +172,8 @@ export const useTimeEntries = () => {
           Status: EntryStatus.Completed,
           IsOvertime: false,
           OvertimeHours: 0,
-          WeekNumber: getISOWeekNumber(startTime),
-          Year: startTime.getFullYear(),
+          WeekNumber: getISOWeekNumber(chicagoStart),
+          Year: chicagoStart.getFullYear(),
         };
 
         const result = await service.create(entry);
